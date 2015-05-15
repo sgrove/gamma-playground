@@ -4,7 +4,7 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
-  :source-paths ["src/clj" "yaks/gamma/src" "yaks/gamma-driver/src"]
+  :source-paths ["src/clj"]
   :repl-options {:timeout 200000} ;; Defaults to 30000 (30 seconds)
 
   :test-paths ["spec/clj"]
@@ -38,7 +38,7 @@
                                         :optimizations :none
                                         :pretty-print  true}}}}
 
-  :profiles {:dev {:source-paths ["env/dev/clj"]
+  :profiles {:dev {:source-paths ["src/cljs" "env/dev/clj"]
                    :test-paths ["test/clj"]
 
                    :dependencies [[figwheel "0.2.1-SNAPSHOT"]
@@ -58,7 +58,7 @@
                    :env {:is-dev true}
 
                    :cljsbuild {:test-commands { "test" ["phantomjs" "env/test/js/unit-test.js" "env/test/unit-test.html"] }
-                               :builds {:app {:source-paths ["env/dev/cljs"]}
+                               :builds {:app {:source-paths ["src/cljs" "env/dev/cljs"]}
                                         :test {:source-paths ["src/cljs" "test/cljs"]
                                                :compiler {:output-to     "resources/public/js/app_test.js"
                                                           :output-dir    "resources/public/js/test"
