@@ -25,9 +25,9 @@
 ;;
 ;; XXX: We're not properly reusing gl context's here, hurts fighweel's
 ;; reloadability
-(def title   lg10/title)
-(def prog    lg10/program-source)
-(def gl-main lg10/main)
+(def title   lg01/title)
+(def prog    lg01/program-source)
+(def gl-main lg01/main)
 
 (defonce app-state (atom {:live {}}))
 
