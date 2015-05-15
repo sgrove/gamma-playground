@@ -12,6 +12,8 @@
   :dependencies [;;[kovasb/gamma "0.1.1"]
                  [org.clojure/clojure "1.6.0"]
                  [org.clojure/clojurescript "0.0-2511" :scope "provided"]
+                 [kovasb/gamma "0.1.2-SNAPSHOT"]
+                 [kovasb/gamma-driver "0.1.0-SNAPSHOT"]
                  [kovasb/fipp "0.5.3"]
                  [ring "1.3.2"]
                  [ring/ring-defaults "0.1.3"]
@@ -28,7 +30,7 @@
 
   :uberjar-name "gampg.jar"
 
-  :cljsbuild {:builds {:app {:source-paths ["src/cljs" "yaks/gamma/src" "yaks/gamma-driver/src"]
+  :cljsbuild {:builds {:app {:source-paths ["src/cljs"]
                              :compiler {:output-to     "resources/public/js/app.js"
                                         :output-dir    "resources/public/js/out"
                                         :source-map    "resources/public/js/out.js.map"
@@ -56,8 +58,8 @@
                    :env {:is-dev true}
 
                    :cljsbuild {:test-commands { "test" ["phantomjs" "env/test/js/unit-test.js" "env/test/unit-test.html"] }
-                               :builds {:app {:source-paths ["env/dev/cljs" "yaks/gamma/src" "yaks/gamma-driver/src"]}
-                                        :test {:source-paths ["src/cljs" "test/cljs" "yaks/gamma/src" "yaks/gamma-driver/src"]
+                               :builds {:app {:source-paths ["env/dev/cljs"]}
+                                        :test {:source-paths ["src/cljs" "test/cljs"]
                                                :compiler {:output-to     "resources/public/js/app_test.js"
                                                           :output-dir    "resources/public/js/test"
                                                           :source-map    "resources/public/js/test.js.map"
