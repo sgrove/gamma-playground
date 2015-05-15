@@ -1,6 +1,6 @@
 # Gamma Playground
 
-Some examples of how to use Gamma and Gamma Driver. In particular, it contains the code translations of the popular (Learn WebGL Series)[http://learningwebgl.com/blog/?page_id=1217]
+Some examples of how to use Gamma and Gamma Driver. In particular, it contains the code translations of the popular [Learn WebGL Series](http://learningwebgl.com/blog/?page_id=1217)
 
 ## Development
 
