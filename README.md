@@ -2,7 +2,7 @@
 
 Some examples of how to use Gamma and Gamma Driver. In particular, it contains the code translations of the popular [Learn WebGL Series](http://learningwebgl.com/blog/?page_id=1217)
 
-Currently lessons 1-10 are ported. Please feel free to take a shot at porting the remaining 6, it's far easier than you might think!
+Currently lessons 1-10 are ported. Please feel free to take a shot at porting the remaining 6, it's far easier than you might think! Head over to [Issues](https://github.com/sgrove/gamma-playground/issues) to see the remaining lessons.
 
 ## Warning
 Please don't take the state of this code as finished - feel free to clean it up, send pull requests, and open issues. This should become a highly-polished introduction to gamma, from beginner usage to advanced.
