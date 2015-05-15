@@ -467,9 +467,8 @@
                                                                 :s     [:forward -0.001]
                                                                 :down  [:forward -0.001]
                                                                 nil)]
-                                        (.preventDefault event)
-                                        (println [:movement direction] speed)
                                         (when direction
+                                          (.preventDefault event)
                                           (swap! state assoc-in [:movement direction] speed)))))
       (js/document.addEventListener "keyup"
                                     (fn [event]
@@ -493,8 +492,7 @@
                                                                 :s     [:forward 0.0]
                                                                 :down  [:forward 0.0]
                                                                 nil)]
-                                        (.preventDefault event)
-                                        (println [:movement direction] speed)
                                         (when direction
+                                          (.preventDefault event)
                                           (swap! state assoc-in [:movement direction] speed))))))))
 
