@@ -5,7 +5,7 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
   :source-paths ["src/clj" "yaks/gamma/src" "yaks/gamma-driver/src"]
-:repl-options {:timeout 200000} ;; Defaults to 30000 (30 seconds)
+  :repl-options {:timeout 200000} ;; Defaults to 30000 (30 seconds)
 
   :test-paths ["spec/clj"]
 
@@ -18,7 +18,8 @@
                  [compojure "1.3.1"]
                  [enlive "1.1.5"]
                  [om "0.8.0-rc1"]
-                 [environ "1.0.0"]]
+                 [environ "1.0.0"]
+                 [thi.ng/geom "0.0.783"]]
 
   :plugins [[lein-cljsbuild "1.0.3"]
             [lein-environ "1.0.0"]]
