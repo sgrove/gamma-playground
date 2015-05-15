@@ -56,9 +56,6 @@
                   (dom/h2 #js{:onClick (fn [event] (om/transact! app :reverse? not))}
                           title)
                   (om/build canvas (:text app) {:opts {:cb (fn [gl node]
-                                                             (swap! app-state update-in [:live] assoc
-                                                                    :gl gl
-                                                                    :node node)
                                                              (gl-main gl node))}})
                   (dom/small nil
                              (dom/pre #js{:style #js{:float "left"
