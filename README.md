@@ -1,5 +1,7 @@
 # Gamma Playground
 
+[![Join the chat at https://gitter.im/kovasb/gamma](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/kovasb/gamma?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Some examples of how to use [Gamma](https://github.com/kovasb/gamma) and [Gamma Driver](https://github.com/kovasb/gamma-driver). In particular, it contains the code translations of the popular [Learn WebGL Series](http://learningwebgl.com/blog/?page_id=1217)
 
 Currently lessons 1-10 are ported. Please feel free to take a shot at porting the remaining 6, it's far easier than you might think! Head over to [Issues](https://github.com/sgrove/gamma-playground/issues) to see the remaining lessons.
