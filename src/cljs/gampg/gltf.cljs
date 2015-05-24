@@ -10,6 +10,10 @@
 ;; data. The next major rework will turn it into an asynchronously
 ;; loading library to remove this major limitation.
 
+;; TODO: Support a pre-processing step to do all of this and save it
+;; out to transit, hopefully with similar file size and already 99%
+;; processed upon load.
+
 (defn decode-data-uri-text [base-64? data]
   (let [result (js/window.decodeURIComponent data)]
     (if base-64?
