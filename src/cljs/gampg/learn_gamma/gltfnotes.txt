@@ -1,0 +1,23 @@
+    #webgl                                                              [00:32]
+<antont> seangrove: this is AFAIK vanilla in the webgl parts .. just uses
+         MontageJS for generic web app framework stuff, but you can ignore
+         that when look at just the gl code:
+         https://github.com/fabrobinet/glTF-webgl-viewer                [00:35]
+<antont> that does not use any 3d lib such as three.js or anything
+<antont> also is the reference impl by one of the gltf guys
+<antont> and i can't find where the gltf loading code is there :)       [00:36]
+<antont> .. within the mvc gui framework app thing                      [00:37]
+<antont> perhaps these: node_modules/mjs-volume/runtime/webgl-renderer.js &
+         node_modules/mjs-volume/ui/scene-view.reel/scene-view.js       [00:39]
+<antont> ah starts to make sense, in
+         https://github.com/fabrobinet/glTF-webgl-viewer/blob/master/node_modules/mjs-volume/ui/scene-view.reel/scene-view.js
+         there are things like:
+<antont> var glTFScene = require("runtime/glTF-scene").glTFScene;       [00:40]
+<antont> var glTFNode = require("runtime/glTF-node").glTFNode;
+<antont> var Scene = require("runtime/scene").Scene;
+<antont> var Node = require("runtime/node").Node;
+<antont> var SceneRenderer = require("runtime/scene-renderer").SceneRenderer;
+<antont> var glTFMaterial = require("runtime/glTF-material").glTFMaterial;
+<antont> seangrove: this seems to be the parser there:
+         https://github.com/fabrobinet/glTF-webgl-viewer/blob/master/node_modules/mjs-volume/runtime/glTF-parser.js
+                                                                        [00:42]

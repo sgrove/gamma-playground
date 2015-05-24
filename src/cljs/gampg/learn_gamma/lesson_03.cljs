@@ -1,6 +1,5 @@
 (ns ^:figwheel-load gampg.learn-gamma.lesson-03
-    (:require [clojure.string :as s]
-              [gamma.api :as g]
+    (:require [gamma.api :as g]
               [gamma.program :as p]
               [gamma-driver.api :as gd]
               [gamma-driver.drivers.basic :as driver]

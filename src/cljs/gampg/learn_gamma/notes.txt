@@ -1,0 +1,428 @@
+so the protocols let u intercept these operations so u can track them
+and also allow u to add new semantics, so u can add a new key in the map and have additional logic happen
+(for instance if u want to introduce a new kind of representation)
+lol prob not till friday
+kovas • 4:07 PM
+Ok, so I get that so far
+Sean Grove
+4:09 PM
+kovas boguta
+once im done with the refactor ill start writing up docs
+kovas • 4:09 PM
+What are the API changes/refactoring to get element-array-buffers in this case - need to implement the protocol methods to instantiate them, but how are you thinking about marking data as intended for a element array/index buffer ?
+Sean Grove
+4:10 PM
+kovas boguta
+so thats in the bind spec
+{{:tag :element-index} indices}
+given how the GL api works, that makes sense to me
+kovas • 4:11 PM
+That part makes sense, but I'm thinking about at the user-call site - e.g. I don't call bind in my code
+Sean Grove
+4:13 PM
+kovas boguta
+right, its the same syntax for draw-program
+kovas • 4:13 PM
+(driver/draw-element-program driver program my-data {:draw-mode :triangles}) ?
+Sorry, the last argument is my local hack 😛
+Sean Grove
+4:14 PM
+kovas boguta
+right
+well
+im still waffling on the final design of the draw functions
+but something like that
+kovas • 4:14 PM
+How many do you envision?
+Sean Grove
+4:14 PM
+kovas boguta
+either 1 or 2
+basically should draw-elements and draw-arrays be 1 thing
+and if it would be wise to detect that element-index has been bound, and just do the right one
+i am inclined to have 2
+kovas • 4:17 PM
+Well, it's easier to start with two and then move into one if you find a silver bullet
+Sean Grove
+4:17 PM
+kovas boguta
+i think its more ideologically consistent to have 2
+kovas • 4:17 PM
+It sound reasonable to me
+One concern I had is this line https://github.com/kovasb/gamma-driver/blob/master/src/gamma_driver/drivers/basic.cljs#L124
+That's going to be called on every draw-program, right?
+Sean Grove
+4:18 PM
+kovas boguta
+thats gonna get abstracted away
+at some point
+yes, you want to let people pass in raw data
+or something convertable to raw data
+kovas • 4:18 PM
+But if I have a large mesh, flattening/converting/shoving into a Float32Array could be expensive to do at 60fps
+Sean Grove
+4:19 PM
+kovas boguta
+i see
+it only happens once
+kovas • 4:19 PM
+Is this one of the cases for a separate driver?
+Sean Grove
+4:19 PM
+kovas boguta
+at bind time
+kovas • 4:19 PM
+Ah, ok
+Sean Grove
+4:19 PM
+kovas boguta
+once its in the gpu dont send again unless u supply it as an arg again
+so if u look at my animate example
+the base data is loaded once
+(this is another reason why tracking state, somehow, is very helpful)
+kovas • 4:21 PM
+Give me just one minute, let me track this down, I'm missing something
+You call bind here in draw-program https://github.com/kovasb/gamma-driver/blob/master/src/gamma_driver/drivers/basic.cljs#L188 
+You bind it explicitly in your animation example https://github.com/kovasb/gamma-examples/blob/master/src/gamma_examples/animate.cljs#L61
+And then it's going to call bind again (transitively) here every time: https://github.com/kovasb/gamma-examples/blob/master/src/gamma_examples/animate.cljs#L44
+Sean Grove
+4:23 PM
+kovas boguta
+yes
+so the very first one puts in the data that will not change
+then when i start iteration the animation
+i feed it only the data that is changing
+kovas • 4:24 PM
+Ahhhh
+Ok, sorry, I missed that
+Sean Grove
+4:24 PM
+kovas boguta
+yeah took me awhile to understand how to do it
+but i think its pretty clean
+kovas • 4:24 PM
+Is it better than doing a diff on each of the bits of data to see what's changed since the last frame?
+Sean Grove
+4:25 PM
+kovas boguta
+yes
+we are trying to model the GL API
+if people want to do diff, they can do it on top of this
+kovas • 4:25 PM
+Ok, so I could implement my SuperDriver and have my bind do the check
+Sean Grove
+4:26 PM
+kovas boguta
+since we intercept the calls, u can build ur own model of the GPU state and reason about it a la carte
+yes, exactly
+kovas • 4:26 PM
+Ok, that's making sense to me now
+Sean Grove
+4:26 PM
+kovas boguta
+great, thats an important point
+will try to hit it in the docs
+(somewhat hard to explain ths stuff)
+kovas • 4:27 PM
+Yeah, no worries. I'm really looking forward to writing the equivalent of LearnWebGL with Gamma - start with the basic driver to cover creating stuff, show what's happening under the hood, then switching to a more featureful/beginner/quick-project-friendly one and showing how we can clean things up
+Alright, so 1.) You're thinking of renaming draw-program to draw-arrays 2.) adding a draw-elements function
+And you need to handle getting the element-array-buffers into/out of memory with the basic driver (looks like you already handle it in the cond for releasing resources at the bottom)
+I'm a tiny, tiny bit fuzzy, but if that's right, I think I have enough to hack on something and try to get element-array-buffers rendering locally, at least
+Sean Grove
+4:31 PM
+kovas boguta
+im pretty excited how much more succinct gamma is
+yeah element-array-buffer is gonna be pretty easy
+i literally think its a tiny change
+if u look at how array-buffer is implemented
+i think its matter of changing the gl contstants
+(though the really get it to work u gotta pass in the count to draw manually)
+(since right now its assuming it needs to calculate using the counts from the attribute inputs)
+kovas • 4:33 PM
+You mean this, right? https://github.com/kovasb/gamma-driver/blob/master/src/gamma_driver/drivers/basic.cljs#L176
+Yeah, good design on the protocol by the way, very clever. Excited about that that means
+Sean Grove
+4:36 PM
+kovas boguta
+u prob wanna intercept here
+https://github.com/kovasb/gamma-driver/blob/master/src/gamma_driver/drivers/basic.cljs#L197
+at least let the user pas the count in
+kovas • 4:37 PM
+Yeah, I'll start with letting the user pass it in
+Sean Grove
+4:37 PM
+kovas boguta
+thanks re: design!
+kovas • 4:37 PM
+Cool, I think have a reasonable idea about driver
+No idea about gamma itself 😉
+Sean Grove
+4:38 PM
+kovas boguta
+haha me neither
+kovas • 4:38 PM
+I'll work on this tonight, thanks
+You going to go the CLA route?
+Sean Grove
+4:39 PM
+kovas boguta
+when u reported a bug and i had to look at the code
+it was rough
+kovas • 4:39 PM
+Haha
+Sean Grove
+4:39 PM
+kovas boguta
+i think im fine taking pull requests
+want i want is 10 sean groves giving me pull requests
+kovas • 4:40 PM
+Heh, alright - I'm happy to sign a CLA any time
+Sean Grove
+4:40 PM
+kovas boguta
+cool
+kovas • 4:40 PM
+I'll work on this and hopefully have a PR for you tomorrow
+Sean Grove
+4:40 PM
+kovas boguta
+thats amazing
+i really appreciate the hekp
+help
+kovas • 4:41 PM
+Hah, I expect to take a lot more value than I contribute, so thanks for the library 😉
+Sean Grove
+4:41 PM
+kovas boguta
+basically i think if i can get another couple of people using it and showing off their stuff, this will take off
+i thnk people like u will be able to build seriously cool shit
+and hopefully getting it all over the internet
+kovas • 58 mins
+Yeah, I'm curious about performance implications, but I don't see anything that should be too bad actually
+Sean Grove
+58 mins
+kovas boguta
+i think its gonna be a huge perf win in the end
+the overhead of resolving a few maps is trivial compared to the graphics operations
+but now you can do all kinds of optimizations
+and not go insane
+kovas • 57 mins
+Heh, interesting point
+Cool, I'll get on this now
+Sean Grove
+57 mins
+kovas boguta
+(ull prob want to precomile the shaders tho)
+kovas • 57 mins
+Have you seen... one minute...
+http://shdr.bkcore.com/
+Reimplementing it with Om/Reagent + Gamma might be illustrative
+Sean Grove
+53 mins
+kovas boguta
+these things are popping up like weeds
+yes
+i agree
+not sure how to get around eval tho
+(would need a server)
+i guess u can type in the maps ☺
+kovas • 52 mins
+Ah, good point
+Interesting 😛
+Sean Grove
+52 mins
+kovas boguta
+i would love to make something like a processing killer tho
+(or someone make it)
+kovas • 51 mins
+Heh, I wish cljs was self-hosting for this kind of thing
+Could make development at least a lot nicer
+Sean Grove
+51 mins
+kovas boguta
+yes
+kovas • 50 mins
+e.g. The in-app tools you could build
+Sean Grove
+50 mins
+kovas boguta
+tots
+though atom-shell is our friend
+kovas • 50 mins
+Interesting point
+Sean Grove
+49 mins
+kovas boguta
+no shame in a 1-click download
+worked for processing
+kovas • 49 mins
+Some shame 😉
+Collaborative-anywhere-webrtc processing would be an interesting area to explore (similar to what precursor has done)
+Owell
+Someday
+Sean Grove
+48 mins
+kovas boguta
+yes some things just require the web
+however being able to work without internet is also good for development
+tradeoffs
+but yeah this is def a case where "try it online" would be great
+kovas • 46 mins
+Yeah, in any case, can cross that bridge when we get to it 😉
+Sean Grove
+46 mins
+kovas boguta
+yup
+dnolen claims self hosting is here if someone will just submit a patch
+kovas • 45 mins
+Yeah, for the reader I think
+Someone took a first pass at it
+Sean Grove
+45 mins
+kovas boguta
+gonna be an exciting year for clj
+shits happening
+the revolution is here
+kovas • 44 mins
+Sean Grove
+Sean crosses fingers
+kovas boguta
+one thing i think people havent realize d is
+immutability is contagious the same way mutability is
+i think everything is conforming to the data processing systems, which themselves are going towards immutable
+kovas • 42 mins
+Interesting point. React:Om :: something-js:Gamma could push people forward
+Sean Grove
+42 mins
+kovas boguta
+def
+i wonder how readily it would port to js
+i suspect it would be fine
+in the long term its probably the best strategy
+to have the js version be the main thing
+kovas • 40 mins
+Sad though
+But again, owell, heh
+Sean Grove
+40 mins
+kovas boguta
+as long as all the interfaces are interoperable with the clojure one
+3js zipped is 130k
+kovas • 39 mins
+Ah, it'd be amazing to be able to build a replacement for 3js - it's so insanely stateful
+It might be a good design actually, I'm not sure, but I used it for WebVR stuff and I was growling the whole time
+Sean Grove
+38 mins
+kovas boguta
+some react-like thing is definitely the goal
+basically need an extensible, declarative graphics langauge
+use that as the "scene graph"
+https://reference.wolfram.com/language/guide/GraphicsObjects.html
+aka the om state
+can probably use specify to cache the conversion to typearrays
+the hard part is breaking it up into multiple draw calls
+and auto-generating the shaders to match
+kovas • 34 mins
+Ah, yes
+Sean Grove
+33 mins
+kovas boguta
+so for instance
+if all ur drawing is circles
+there is a totally optimized shader for that
+not the generic monlith shader that does everything
+and now if u change ur graphis to contain an image of a dog and also the circles
+we need to generate the shader for that
+(might need some schema so we can do this would inspecting every element)
+without
+kovas • 31 mins
+Sorry, back to the code - I'm still thinking about how to get a tag of :element-index onto the element here https://github.com/kovasb/gamma-driver/blob/master/src/gamma_driver/drivers/basic.cljs#L97
+I guess it should be part of the variable declaration?
+Sean Grove
+28 mins
+kovas boguta
+no
+just put on an en entry into the data map
+put it in together with the other variable-data mappings
+{a-pos positions, {:tag :element-index} indices }
+its weird to think about but the GL api is basically like, fill a value in here, change semantics of the values there
+so u dont touch the variables at all
+u just add a new thing and suddently everthing is interpreted as indexed (provided u call draw-elements)
+does that make sense?
+kovas • 24 mins
+Yeah, let me double check to make sure I'm not remembering things incorrectly (it's been awhile, hence porting the webgl tuts over)
+Let's take this as an example: https://github.com/gpjt/webgl-lessons/blob/master/lesson04/index.html#L152
+The pyramid is simple, it's all array buffers
+The cube is two array buffers, and one element-array-buffer
+Sean Grove
+18 mins
+kovas boguta
+yeah
+kovas • 18 mins
+How do you know from the data which is which?
+ahhh
+indices
+Sean Grove
+17 mins
+kovas boguta
+u never bind the element-array any variable
+kovas • 17 mins
+By definition that's going to be the one that gets buffered as the element-array-buffer, everything else is array-buffer
+in {a-pos positions, {:tag :element-index} indices }
+Sean Grove
+17 mins
+kovas boguta
+yeah
+kovas • 17 mins
+Ok, easy
+Sean Grove
+17 mins
+kovas boguta
+so
+https://github.com/gpjt/webgl-lessons/blob/master/lesson04/index.html#L274
+is what u put as the value of {:tag :element-index} key
+kovas • 16 mins
+Makes sense now
+Sorry for being thick
+Sean Grove
+16 mins
+kovas boguta
+np
+kovas • 16 mins
+Continuing along now
+Sean Grove
+16 mins
+kovas boguta
+for a while i was agonizing about how to represent it
+since its somewhat complected
+which is probably why its less easy to understand
+i think just sticking to what the GL API is makes the most sense
+kovas • 15 mins
+It's understandable - if you can think of something better, I'd heartily embrace it, but I'll implement this for now 😉
+Sean Grove
+14 mins
+kovas boguta
+thing is, people are pretty to come up with better abstractions
+and now have a reasonable way to implement them
+free
+kovas • 14 mins
+Good point
+Sean Grove
+13 mins
+kovas boguta
+im calling this design principle avoiding incidental abstraction
+no extra abstractions beyond was is necessary
+kovas • 12 mins
+Sebastian Markbage: Minimal API Surface Area | JSConf EU 2014Sebastian Markbage: Minimal API Surface Area | JSConf EU 2014
+https://www.youtube.com/watch?v=4anAwXYqLG8
+You have a friend in Sema 😉
+Sean Grove
+11 mins
+kovas boguta
+nice
+kovas • 11 mins
+"Abstractions spread"
+It's a good talk, I like Sema a lot. Very thoughtful person.
+Sean Grove
+11 mins
+kovas boguta
