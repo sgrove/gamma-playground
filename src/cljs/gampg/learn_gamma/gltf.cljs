@@ -1,21 +1,16 @@
 (ns ^:figwheel-load gampg.learn-gamma.gltf
     (:require [gamma.api :as g]
               [gamma.program :as p]
-              [gamma.tools :as gt]
+              [gamma-driver.api :as gd]
               [gamma-driver.drivers.basic :as driver]
-              [gamma-driver.protocols :as dp]
               [gampg.gltf :as gltf]
               [goog.Uri]
-              [goog.webgl :as ggl]
               [thi.ng.geom.core :as geom]
-              [thi.ng.geom.core.matrix :as mat :refer [M44]]
-              [thi.ng.geom.webgl.arrays :as arrays])
+              [thi.ng.geom.core.matrix :as mat :refer [M44]])
     (:import [goog.net XhrIo]))
 
-
-
 (def title
-  "Loading a Collada model (by not loading it).")
+  "Loading a glTF model")
 
 (def u-p-matrix
   (g/uniform "uPMatrix" :mat4))
@@ -67,21 +62,6 @@
 
 (def v-tex-coord-0
   (g/varying "v_texcoord0" :vec2 :highp))
-
-;; precision highp float;
-;; varying vec3 v_normal;
-;; uniform vec4 u_diffuse;
-;; void main(void) {
-;; vec3 normal = normalize(v_normal);
-;; vec4 color = vec4(0., 0., 0., 0.);
-;; vec4 diffuse = vec4(0., 0., 0., 1.);
-;; diffuse = u_diffuse;
-;; diffuse.xyz *= max(dot(normal,vec3(0.,0.,1.)), 0.);
-;; color.xyz += diffuse.xyz;
-;; color = vec4(color.rgb * diffuse.a, diffuse.a);
-;; gl_FragColor = color;
-;; }
-
 
 (def u-light-angle
   (g/uniform "uLightAngle" :vec3))
@@ -218,10 +198,10 @@
                             (let [mv (geom/* mv (:matrix node))]
                               (doseq [mesh (:meshes node)]
                                 (doseq [mesh (:primitives mesh)]
-                                  (let [vertices         (get-in mesh [:attributes :p :data])
+                                  (let [vertices         (get-in mesh [:attributes :p])
                                         p-stride         (get-in mesh [:attributes :p :byteStride])
-                                        tex-coord-0      (get-in mesh [:attributes :tex-coord-0 :data])
-                                        normals          (get-in mesh [:attributes :normal :data])
+                                        tex-coord-0      (get-in mesh [:attributes :tex-coord-0])
+                                        normals          (get-in mesh [:attributes :normal])
                                         n-stride         (get-in mesh [:attributes :normal :byteStride])
                                         indices          (get-in mesh [:indices])
                                         material         (get-in mesh [:material :values :diffuse])
@@ -234,9 +214,10 @@
                                                            material)
                                         sampler          (:sampler material)
                                         draw-count       (:count indices)
-                                        program          (if texture-program?
-                                                           (get-in state [:runtime :programs 3])
-                                                           (get-in state [:runtime :programs 1]))
+                                        program-name     (if texture-program?
+                                                           :texture-light
+                                                           :diffuse-light)
+                                        program          (get-in state [:runtime :programs program-name])
                                         scene-data       (when normals
                                                            (select-keys (get-data now
                                                                                   p mv
@@ -246,19 +227,14 @@
                                                                                   material
                                                                                   tex-coord-0)
                                                                         (:inputs program)))]
-                                    ;;(js/console.log (clj->js diffuse))
-                                    ;;(js/console.log (clj->js scene-data))
-                                    ;;(js/console.log (clj->js program))
+                                    ;;(js/console.log (pr-str program-name))
                                     ;; Check for normals so we don't try to draw e.g. lines right now.
-                                    (when normals
-                                      (try
-                                        (driver/draw-elements driver program
-                                                              (assoc scene-data
-                                                                     {:tag :element-index} indices)
-                                                              {:draw-mode (:draw-mode mesh)
-                                                               :count     draw-count})
-                                        (catch js/Error e
-                                          nil))))))
+                                    (when (and diffuse normals)
+                                      (gd/draw-elements driver (gd/bind driver program
+                                                                        (assoc scene-data
+                                                                               {:tag :element-index} indices))
+                                                        {:draw-mode (:draw-mode mesh)
+                                                         :count     draw-count})))))
                               (doseq [child (vals (:children node))]
                                 (render-node [(:name child) child] mv))))]
       (doseq [node (:nodes scene)]
@@ -269,7 +245,7 @@
                                              (geom/rotate-around-axis [0 0 1] (- (/ mouse-y 50)))))))))
 
 (def manual-step-frame-by-frame?
-  false)
+  true)
 
 (defn animate [draw-fn step-fn current-value]
   (js/requestAnimationFrame
@@ -329,11 +305,10 @@
         height           (.-clientHeight node)
         driver           (make-driver gl)
         starting-program 0
-        programs         (mapv #(dp/program driver %)
-                               [program-diffuse-flat
-                                program-diffuse-light
-                                program-texture-flat
-                                program-texture-light])
+        programs         {:diffuse-flat  program-diffuse-flat
+                          :diffuse-light program-diffuse-light
+                          :texture-flat  program-texture-flat
+                          :texture-light program-texture-light}
         state            (-> (app-state width height)
                              (assoc-in [:runtime :programs] programs)
                              (assoc-in [:runtime :current-program] 0))]
@@ -357,4 +332,4 @@
                                                     (animate (draw-fn gl driver) tick (-> state
                                                                                           (assoc-in [:gltf] gltf)))))
                   (animate (draw-fn gl driver) tick (-> state
-                                                                (assoc-in [:gltf] gltf))))))))
+                                                        (assoc-in [:gltf] gltf))))))))
