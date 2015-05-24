@@ -1,14 +1,10 @@
 (ns gampg.learn-gamma.lesson-09
-  (:require [clojure.string :as s]
-            [gamma.api :as g]
+  (:require [gamma.api :as g]
             [gamma.program :as p]
-            [gamma.tools :as gt]
+            [gamma-driver.api :as gd]
             [gamma-driver.drivers.basic :as driver]
-            [gamma-driver.protocols :as dp]
-            [goog.webgl :as ggl]
             [thi.ng.geom.core :as geom]
-            [thi.ng.geom.core.matrix :as mat :refer [M44]]
-            [thi.ng.geom.webgl.arrays :as arrays]))
+            [thi.ng.geom.core.matrix :as mat :refer [M44]]))
 
 (def title
   "9. Lots of moving objects")
@@ -123,11 +119,11 @@
                      (geom/rotate-around-axis [0 0 1] (:angle star))
                      (geom/translate [(:distance star) 0 -7])
                      (geom/rotate-around-axis [0 0 -1] (- (:angle star))))]
-          (driver/draw-arrays driver program
-                               (get-data p mv star-vertices texture star-texture-coords (if twinkle?
-                                                                                          (:twinkle star)
-                                                                                          (:color star)))
-                               {:draw-mode :triangle-strip}))))))  
+          (gd/draw-arrays driver (gd/bind driver program
+                                          (get-data p mv star-vertices texture star-texture-coords (if twinkle?
+                                                                                                     (:twinkle star)
+                                                                                                     (:color star))))
+                          {:draw-mode :triangle-strip}))))))  
 
 (defn animate [draw-fn step-fn current-value]
   (js/requestAnimationFrame
@@ -165,7 +161,7 @@
   (let [width   (.-clientWidth node)
         height  (.-clientHeight node)
         driver  (driver/basic-driver gl)
-        program (dp/program driver program-source)
+        program program-source
         state   (app-state width height)]
     (reset-gl-canvas! node)
     ;; Set the blending function
@@ -176,10 +172,10 @@
     (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
     (let [image (js/Image.)]
       (aset image "onload"
-            (fn [] (let [texture {:data {:data       image
-                                        :filter     {:min :linear
-                                                     :mag :nearest}
-                                        :flip-y     true
-                                        :texture-id 0}}]
+            (fn [] (let [texture {:data       image
+                                 :filter     {:min :linear
+                                              :mag :nearest}
+                                 :flip-y     true
+                                 :texture-id 0}]
                     (animate (draw-fn gl driver program) tick (assoc-in state [:scene :texture] texture)))))
       (aset image "src" "/images/star.gif"))))

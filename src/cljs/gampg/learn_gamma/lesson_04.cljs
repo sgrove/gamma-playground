@@ -1,14 +1,10 @@
 (ns ^:figwheel-load gampg.learn-gamma.lesson-04
-    (:require [clojure.string :as s]
-            [gamma.api :as g]
-            [gamma.program :as p]
-            [gamma.tools :as gt]
-            [gamma-driver.drivers.basic :as driver]
-            [gamma-driver.protocols :as dp]
-            [goog.webgl :as ggl]
-            [thi.ng.geom.core :as geom]
-            [thi.ng.geom.core.matrix :as mat :refer [M44]]
-            [thi.ng.geom.webgl.arrays :as arrays]))
+    (:require [gamma.api :as g]
+              [gamma.program :as p]
+              [gamma-driver.api :as gd]
+              [gamma-driver.drivers.basic :as driver]
+              [thi.ng.geom.core :as geom]
+              [thi.ng.geom.core.matrix :as mat :refer [M44]]))
 
 (def title
   "4. Some Real 3D Objects")
@@ -171,17 +167,17 @@
       (let [mv (-> mv
                    (geom/translate [-1.5 0 -7])
                    (geom/rotate-y pyramid-rotation))]
-        (driver/draw-arrays driver program (get-data p mv pyramid-vertices pyramid-colors) {:draw-mode :triangles}))
+        (gd/draw-arrays driver (gd/bind driver program (get-data p mv pyramid-vertices pyramid-colors)) {:draw-mode :triangles}))
       (let [mv (-> mv
                    (geom/translate [3 0 -7])
                    (geom/rotate-x cube-rotation))]
-        (driver/draw-elements driver program
-                          (assoc (get-data p mv cube-vertices cube-colors)
-                            {:tag :element-index} cube-indices)
+        (gd/draw-elements driver (gd/bind driver program
+                                          (assoc (get-data p mv cube-vertices cube-colors)
+                                                 {:tag :element-index} cube-indices))
                           {:draw-mode :triangles
-                           :first 0
-                           :count 36 ;;Hard-coded
-                           })))))
+                           :first     0
+                           ;;Hard-coded
+                           :count     36})))))
 
 (defn animate [draw-fn step-fn current-value]
   (js/requestAnimationFrame
@@ -210,7 +206,7 @@
   (let [width     (.-clientWidth node)
         height    (.-clientHeight node)
         driver    (make-driver gl)
-        program   (dp/program driver program-source)
+        program   program-source
         state (app-state width height)]
     (set! (.-debugRedrawScene js/window)
           (fn []

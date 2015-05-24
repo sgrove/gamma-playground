@@ -1,14 +1,10 @@
 (ns gampg.learn-gamma.lesson-01
-    (:require [clojure.string :as s]
-            [gamma.api :as g]
+  (:require [gamma.api :as g]
             [gamma.program :as p]
-            [gamma.tools :as gt]
+            [gamma-driver.api :as gd]
             [gamma-driver.drivers.basic :as driver]
-            [gamma-driver.protocols :as dp]
-            [goog.webgl :as ggl]
             [thi.ng.geom.core :as geom]
-            [thi.ng.geom.core.matrix :as mat :refer [M44]]
-            [thi.ng.geom.webgl.arrays :as arrays]))
+            [thi.ng.geom.core.matrix :as mat :refer [M44]]))
 
 (def title
   "1. A triangle and a square")
@@ -62,7 +58,7 @@
   (let [w                 (.-clientWidth node)
         h                 (.-clientHeight node)
         driver            (make-driver gl)
-        program           (dp/program driver program-source)
+        program           program-source
         p                 (get-perspective-matrix w h)
         mv                (mat/matrix44)
         triangle-vertices [[ 0  1  0]
@@ -76,6 +72,6 @@
     (.clearColor gl 0 0 0 1)
     (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
     (let [mv (geom/translate mv [-1.5 0 -7])]
-      (driver/draw-arrays driver program (get-data p mv triangle-vertices) {:draw-mode :triangles}))
+      (gd/draw-arrays driver (gd/bind driver program (get-data p mv triangle-vertices)) {:draw-mode :triangles}))
     (let [mv (geom/translate mv [3 0 -7])]
-      (driver/draw-arrays driver program (get-data p mv square-vertices) {:draw-mode :triangle-strip}))))
+      (gd/draw-arrays driver (gd/bind driver program (get-data p mv square-vertices)) {:draw-mode :triangle-strip}))))
