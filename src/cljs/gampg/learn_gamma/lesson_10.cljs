@@ -1,14 +1,10 @@
 (ns gampg.learn-gamma.lesson-10
-  (:require [clojure.string :as s]
-            [gamma.api :as g]
+  (:require [gamma.api :as g]
             [gamma.program :as p]
-            [gamma.tools :as gt]
+            [gamma-driver.api :as gd]
             [gamma-driver.drivers.basic :as driver]
-            [gamma-driver.protocols :as dp]
-            [goog.webgl :as ggl]
             [thi.ng.geom.core :as geom]
-            [thi.ng.geom.core.matrix :as mat :refer [M44]]
-            [thi.ng.geom.webgl.arrays :as arrays]))
+            [thi.ng.geom.core.matrix :as mat :refer [M44]]))
 
 ;; With some better architecture,
 ;; this could easily go away
@@ -376,9 +372,9 @@
                    (geom/translate [(- (:x camera))
                                     (- (:y camera))
                                     (- (:z camera))]))]
-        (driver/draw-arrays driver program
-                             (get-data p mv vertices texture texture-coords)
-                             {:draw-mode :triangles})))))  
+        (gd/draw-arrays driver (gd/bind driver program
+                                        (get-data p mv vertices texture texture-coords))
+                        {:draw-mode :triangles})))))  
 
 (defn animate [draw-fn step-fn current-value]
   (js/requestAnimationFrame
@@ -407,30 +403,26 @@
                        (update-in [:scene :camera :z] (fn [z] (- z (* (js/Math.cos (:yaw camera)) walk-speed elapsed))))
                        (update-in [:scene :camera :yaw] + (* turn-speed elapsed))
                        (assoc-in [:last-rendered] time-now))]
-    (println (get-in ns [:scene :camera]))
     ns))
 
 (defn main [gl node]  
   (let [width   (.-clientWidth node)
         height  (.-clientHeight node)
         driver  (driver/basic-driver gl)
-        program (dp/program driver program-source)
+        program program-source
         state   (atom (make-app-state width height))]
     (def app-state state)
     (reset-gl-canvas! node)
-    ;; Set the blending function
-    ;;(.blendFunc gl (.-SRC_ALPHA gl) (.-ONE gl))
-    ;;(.enable gl (.-BLEND gl))
     (.enable gl (.-DEPTH_TEST gl))
     (.clearColor gl 0 0 0 1)
     (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
     (let [image (js/Image.)]
       (aset image "onload"
-            (fn [] (let [texture {:data {:data       image
-                                        :filter     {:min :linear
-                                                     :mag :nearest}
-                                        :flip-y     true
-                                        :texture-id 0}}]
+            (fn [] (let [texture {:data       image
+                                 :filter     {:min :linear
+                                              :mag :nearest}
+                                 :flip-y     true
+                                 :texture-id 0}]
                     (swap! state assoc-in [:scene :texture] texture)
                     (set! (.-debugRedrawScene js/window)
                           (fn []
