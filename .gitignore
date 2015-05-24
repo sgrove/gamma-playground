@@ -12,3 +12,5 @@ pom.xml.asc
 /.repl
 yaks
 .DS_Store
+.idea
+.repl*
