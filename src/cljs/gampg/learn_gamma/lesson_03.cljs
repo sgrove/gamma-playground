@@ -1,14 +1,11 @@
 (ns ^:figwheel-load gampg.learn-gamma.lesson-03
     (:require [clojure.string :as s]
-            [gamma.api :as g]
-            [gamma.program :as p]
-            [gamma.tools :as gt]
-            [gamma-driver.drivers.basic :as driver]
-            [gamma-driver.protocols :as dp]
-            [goog.webgl :as ggl]
-            [thi.ng.geom.core :as geom]
-            [thi.ng.geom.core.matrix :as mat :refer [M44]]
-            [thi.ng.geom.webgl.arrays :as arrays]))
+              [gamma.api :as g]
+              [gamma.program :as p]
+              [gamma-driver.api :as gd]
+              [gamma-driver.drivers.basic :as driver]
+              [thi.ng.geom.core :as geom]
+              [thi.ng.geom.core.matrix :as mat :refer [M44]]))
 
 (def title
   "3. A bit of movement")
@@ -100,11 +97,11 @@
       (let [mv (-> mv
                    (geom/translate [-1.5 0 -7])
                    (geom/rotate-y triangle-rotation))]
-        (driver/draw-arrays driver program (get-data p mv triangle-vertices triangle-colors) {:draw-mode :triangles}))
+        (gd/draw-arrays driver (gd/bind driver program (get-data p mv triangle-vertices triangle-colors)) {:draw-mode :triangles}))
       (let [mv (-> mv
                    (geom/translate [3 0 -7])
                    (geom/rotate-x square-rotation))]
-        (driver/draw-arrays driver program (get-data p mv square-vertices square-colors) {:draw-mode :triangle-strip})))))
+        (gd/draw-arrays driver (gd/bind driver program (get-data p mv square-vertices square-colors)) {:draw-mode :triangle-strip})))))
 
 (defn animate [draw-fn step-fn current-value]
   (js/requestAnimationFrame
@@ -129,11 +126,11 @@
         (assoc-in [:last-rendered] time-now))))
 
 (defn main [gl node]
-  (let [width     (.-clientWidth node)
-        height    (.-clientHeight node)
-        driver    (make-driver gl)
-        program   (dp/program driver program-source)
-        state (app-state width height)]
+  (let [width   (.-clientWidth node)
+        height  (.-clientHeight node)
+        driver  (make-driver gl)
+        program program-source
+        state   (app-state width height)]
     (reset-gl-canvas! node)
     (.clearColor gl 0 0 0 1)
     (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
