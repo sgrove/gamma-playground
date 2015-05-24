@@ -217,6 +217,13 @@
                                                 :sampler             sampler
                                                 :target              target
                                                 :type                type}
+                                               ;; Merging this here as
+                                               ;; well so it conforms
+                                               ;; with Gamma's view of
+                                               ;; texture
+                                               ;; :filter/:wrap key
+                                               ;; placement
+                                               sampler
                                                src)})) (:textures gltf)))))
 
 (defn process-shaders [gltf]
@@ -262,11 +269,11 @@
                           ;; XXX Check if this is a vector or a map,
                           ;; and change accordingly (right now
                           ;; hard-coding for the duck)
+                          ;; XXX: Map this over every value rather than just diffuse
                           diffuse (get-in gltf [:textures (keyword (:diffuse values))])]
                       {material-name {:values (merge values
                                                      (when diffuse {:diffuse diffuse}))
-                                      :name   (:name material-description)
-                                      }})) (:materials gltf)))))
+                                      :name   (:name material-description)}})) (:materials gltf)))))
 
 (defn process-attr [gltf [attr-name accessor-name]]
   (let [accessor (get-in gltf [:accessors (keyword accessor-name)])
