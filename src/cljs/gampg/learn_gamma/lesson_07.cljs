@@ -1,14 +1,10 @@
 (ns gampg.learn-gamma.lesson-07
-    (:require [clojure.string :as s]
-            [gamma.api :as g]
+  (:require [gamma.api :as g]
             [gamma.program :as p]
-            [gamma.tools :as gt]
+            [gamma-driver.api :as gd]
             [gamma-driver.drivers.basic :as driver]
-            [gamma-driver.protocols :as dp]
-            [goog.webgl :as ggl]
             [thi.ng.geom.core :as geom]
-            [thi.ng.geom.core.matrix :as mat :refer [M44]]
-            [thi.ng.geom.webgl.arrays :as arrays]))
+            [thi.ng.geom.core.matrix :as mat :refer [M44]]))
 
 (def title
   "7. Basic directional and ambient lighting")
@@ -247,13 +243,13 @@
                    (geom/translate [x 0 -7])
                    (geom/rotate-around-axis [1 0 0] cube-rotation)
                    (geom/rotate-around-axis [0 -1 0] cube-rotation))]
-        (driver/draw-elements driver program
-                          (assoc (get-data p mv cube-vertices cube-normals texture cube-texture-coords)
-                            {:tag :element-index} cube-indices)
+        (gd/draw-elements driver (gd/bind driver program
+                                          (assoc (get-data p mv cube-vertices cube-normals texture cube-texture-coords)
+                                                 {:tag :element-index} cube-indices))
                           {:draw-mode :triangles
-                           :first 0
+                           :first     0
                            ;; Hard-coded
-                           :count 36})))))  
+                           :count     36})))))  
 
 (defn animate [draw-fn step-fn current-value]
   (js/requestAnimationFrame
@@ -279,7 +275,7 @@
   (let [width     (.-clientWidth node)
         height    (.-clientHeight node)
         driver    (driver/basic-driver gl)
-        program   (dp/program driver program-source)
+        program   program-source
         state (app-state width height)]
     (reset-gl-canvas! node)
     (.enable gl (.-DEPTH_TEST gl))
@@ -287,10 +283,10 @@
     (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
     (let [image (js/Image.)]
       (aset image "onload"
-            (fn [] (let [texture {:data {:data       image
-                                        :filter     {:min :linear
-                                                     :mag :nearest}
-                                        :flip-y     true
-                                        :texture-id 0}}]
+            (fn [] (let [texture {:data       image
+                                 :filter     {:min :linear
+                                              :mag :nearest}
+                                 :flip-y     true
+                                 :texture-id 0}]
                     (animate (draw-fn gl driver program) tick (assoc-in state [:scene :texture] texture)))))
       (aset image "src" "/images/crate.gif"))))
