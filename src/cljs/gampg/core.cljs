@@ -1,11 +1,5 @@
 (ns ^:figwheel-always gampg.core
-  (:require [clojure.string :as s]
-            [gamma.api :as g]
-            [gamma.program :as p]
-            [gamma.tools :as gt]
-            [gamma-driver.drivers.basic :as driver]
-            [gamma-driver.protocols :as dp]
-            [gampg.learn-gamma.lesson-01 :as lg01]
+  (:require [gampg.learn-gamma.lesson-01 :as lg01]
             [gampg.learn-gamma.lesson-02 :as lg02]
             [gampg.learn-gamma.lesson-03 :as lg03]
             [gampg.learn-gamma.lesson-04 :as lg04]
@@ -16,7 +10,6 @@
             [gampg.learn-gamma.lesson-09 :as lg09]
             [gampg.learn-gamma.lesson-10 :as lg10]
             [gampg.learn-gamma.gltf :as lg-gltf]
-            [goog.webgl :as ggl]
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]))
 
@@ -27,7 +20,7 @@
 ;; XXX: We're not properly reusing gl context's here, hurts fighweel's
 ;; reloadability
 (def title   lg-gltf/title)
-(def prog    lg-gltf/program-source)
+(def prog    lg-gltf/program-texture-light)
 (def gl-main lg-gltf/main)
 
 (defonce app-state (atom {:live {}}))
