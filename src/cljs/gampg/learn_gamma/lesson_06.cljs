@@ -1,14 +1,11 @@
 (ns ^:figwheel-load gampg.learn-gamma.lesson-06
     (:require [clojure.string :as s]
-            [gamma.api :as g]
-            [gamma.program :as p]
-            [gamma.tools :as gt]
-            [gamma-driver.drivers.basic :as driver]
-            [gamma-driver.protocols :as dp]
-            [goog.webgl :as ggl]
-            [thi.ng.geom.core :as geom]
-            [thi.ng.geom.core.matrix :as mat :refer [M44]]
-            [thi.ng.geom.webgl.arrays :as arrays]))
+              [gamma.api :as g]
+              [gamma.program :as p]
+              [gamma-driver.api :as gd]
+              [gamma-driver.drivers.basic :as driver]
+              [thi.ng.geom.core :as geom]
+              [thi.ng.geom.core.matrix :as mat :refer [M44]]))
 
 (def title
   "6. Keyboard input and texture filters")
@@ -36,11 +33,9 @@
    {:vertex-shader   {(g/gl-position) (-> u-p-matrix
                                           (g/* u-mv-matrix)
                                           (g/* (g/vec4 a-position 1)))
-                      v-texture-coord a-texture-coord
-                      }
+                      v-texture-coord a-texture-coord}
     :fragment-shader {(g/gl-frag-color)
-                      (g/texture2D u-sampler (g/vec2 (g/swizzle v-texture-coord :st)))
-                      }}))
+                      (g/texture2D u-sampler (g/vec2 (g/swizzle v-texture-coord :st)))}}))
 
 (defn get-perspective-matrix
   "Be sure to 
@@ -171,21 +166,20 @@
                    (geom/rotate-around-axis [1 0 0] cube-rotation)
                    (geom/rotate-around-axis [0 1 0] cube-rotation)
                    (geom/rotate-around-axis [0 0 1] cube-rotation))]
-        (driver/draw-elements driver program
-                          (assoc (get-data p mv cube-vertices texture cube-texture-coords)
-                            {:tag :element-index} cube-indices)
+        (gd/draw-elements driver (gd/bind driver program
+                                          (assoc (get-data p mv cube-vertices texture cube-texture-coords)
+                                                 {:tag :element-index} cube-indices))
                           {:draw-mode :triangles
-                           :first 0
-                           :count 36 ;;Hard-coded
-                           })))))
+                           :first     0
+                           ;; Hard-coded
+                           :count     36})))))
 
 (defn animate [draw-fn step-fn current-value]
   (js/requestAnimationFrame
    (fn [time]
      (let [next-value (step-fn time current-value)]
        (draw-fn next-value)
-       (animate draw-fn step-fn next-value)
-       ))))
+       (animate draw-fn step-fn next-value)))))
 
 (defn tick
   "Takes the old world value and produces a new world value, suitable
@@ -204,9 +198,9 @@
   (let [width     (.-clientWidth node)
         height    (.-clientHeight node)
         driver    (make-driver gl)
-        program   (dp/program driver program-source)
+        program   program-source
         state (app-state width height)]
-    
+
     (reset-gl-canvas! node)
     (.enable gl (.-DEPTH_TEST gl))
     (.clearColor gl 0 0 0 1)
@@ -214,10 +208,10 @@
     
     (let [image (js/Image.)]
       (aset image "onload"
-            (fn [] (let [texture {:data {:data image
-                                        :filter {:min :linear
-                                                 :mag :linear-mipmap-nearest}
-                                        :flip-y true
-                                        :texture-id 0}}]
+            (fn [] (let [texture {:data image
+                                 :filter {:min :linear
+                                          :mag :linear}
+                                 :flip-y true
+                                 :texture-id 0}]
                     (animate (draw-fn gl driver program) tick (assoc-in state [:scene :texture] texture)))))
       (aset image "src" "/images/crate.gif"))))
