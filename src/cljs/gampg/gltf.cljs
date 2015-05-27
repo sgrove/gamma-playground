@@ -53,7 +53,8 @@
     (assoc gltf :buffers
            (reduce merge {} (map (fn [[buffer-name buffer-description]]
                                    {buffer-name (assoc buffer-description
-                                                       :data (data-uri->array-buffer (:uri buffer-description)))}) buffers)))))
+                                                       :data (data-uri->array-buffer (:uri buffer-description))
+                                                       :immutable? true)}) buffers)))))
 
 (defn process-buffer-views [gltf]
   (let [buffer-views (:bufferViews gltf)]
@@ -66,7 +67,8 @@
                                 byte-length (:byteLength bv-description)
                                 data        (js/DataView. (:data buffer) byte-offset byte-length)]
                             {bv-name (assoc bv-description
-                                            :data data)})) buffer-views)))))
+                                            :data data
+                                            :immutable? true)})) buffer-views)))))
 
 (defn process-accessors [gltf]
   (let [accessors (:accessors gltf)]
@@ -158,7 +160,7 @@
                                     (do
                                       (js/console.log "Failed to read " (pr-str data-type) "(" bytes-per-element "/element) @ root-offset: " root-read-offset (+ root-read-offset (* stride i)))
                                       (throw e))))))
-                            (js/console.log "Data read: " (.-length data2) " length")
+                            ;;(js/console.log "Data read: " (.-length data2) " length")
                             #_(js/console.log "Process-Accessors: " (pr-str acc-name)
                                             (pr-str {:data-type      (pr-str data-type)
                                                      :offset         offset
@@ -171,6 +173,7 @@
                                             data2)
                             {acc-name (assoc acc-description
                                              :data data2
+                                             :immutable? true
                                              :buffer-view bv
                                              :clj-type clj-type)})) accessors)))))
 
@@ -184,6 +187,7 @@
                           (set! (.-src image) (:uri image-description))
                           {image-name (merge image-description
                                              {:data        image
+                                              :immutable?  true
                                               :buffer-data buffer-data
                                               :mime        mime-type})})) (:images gltf)))))
 
@@ -191,8 +195,8 @@
   (assoc gltf :samplers
          (reduce merge {}
                  (map (fn [[sampler-name sampler-description]]
-                        (let [min-filter (utils/value->enum (:minFilter sampler-description))
-                              mag-filter (utils/value->enum (:magFilter sampler-description))
+                        (let [min-filter :nearest ;;(utils/value->enum (:minFilter sampler-description))
+                              mag-filter :nearest ;;(utils/value->enum (:magFilter sampler-description))
                               wrap-s     (utils/value->enum (:wrapS sampler-description))
                               wrap-t     (utils/value->enum (:wrapT sampler-description))]
                           {sampler-name (merge sampler-description
@@ -300,7 +304,8 @@
                                         (map (fn [primitive]
                                                (let [attrs (reduce merge {} (mapv (partial process-attr gltf) (:attributes primitive)))
                                                      indices (merge (get-in gltf [:accessors (keyword (:indices primitive))])
-                                                                    {:accessor-name (keyword (:indices primitive))})
+                                                                    {:accessor-name (keyword (:indices primitive))
+                                                                     :immutable? true})
                                                      material (get-in gltf [:materials (keyword (:material primitive))])]
                                                  (assoc primitive
                                                         :name mesh-name

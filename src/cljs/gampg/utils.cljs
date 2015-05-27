@@ -1,4 +1,7 @@
-(ns gampg.utils)
+(ns gampg.utils
+  (:require [goog.webgl :as ggl]
+            [thi.ng.geom.core :as geom]
+            [thi.ng.geom.core.matrix :as mat :refer [M44]]))
 
 ;; Note this is bad form in production, it can't be optimized away
 ;; https://groups.google.com/d/msg/clojurescript/3QmukS-q9kw/v9dnXfWhGm8J
@@ -294,3 +297,30 @@
    0x8b31     :vertex-shader
    0x0ba2     :viewport
    0          :zero})
+
+(defn load-cube-map [gl base cb]
+  (let [loader  (atom [[0 (str base "/" "posx.jpg") false]
+                       [1 (str base "/" "negx.jpg") false]
+                       [2 (str base "/" "posy.jpg") false]
+                       [3 (str base "/" "negy.jpg") false]
+                       [4 (str base "/" "posz.jpg") false]
+                       [5 (str base "/" "negz.jpg") false]])]
+    (doseq [[n src] @loader]
+      (let [img (js/Image.)]
+        (set! (.-onload img) ((fn [image]
+                                (fn []
+                                  (swap! loader (fn [loader]
+                                                  (update-in loader [n] (fn [[n src _]]
+                                                                          [n src img]))))
+                                  (when (every? last @loader)
+                                    (let [faces @loader
+                                          final {:faces {:x [(last (nth faces 0))
+                                                             (last (nth faces 1))]
+                                                         :y [(last (nth faces 2))
+                                                             (last (nth faces 3))]
+                                                         :z [(last (nth faces 4))
+                                                             (last (nth faces 5))]}
+                                                 :filter {:min :linear
+                                                          :mag :linear}}]
+                                      (cb final))))) img))
+        (set! (.-src img) src)))))

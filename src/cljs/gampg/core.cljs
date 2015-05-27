@@ -9,6 +9,10 @@
             [gampg.learn-gamma.lesson-08 :as lg08]
             [gampg.learn-gamma.lesson-09 :as lg09]
             [gampg.learn-gamma.lesson-10 :as lg10]
+            [gampg.learn-gamma.lesson-11 :as lg11]
+            [gampg.learn-gamma.lesson-12 :as lg12]
+            ;;[gampg.learn-gamma.lesson-20 :as lg20]
+            ;;[gampg.learn-gamma.apartment :as lg-apartment]
             [gampg.learn-gamma.gltf :as lg-gltf]
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]))
@@ -19,9 +23,13 @@
 ;;
 ;; XXX: We're not properly reusing gl context's here, hurts fighweel's
 ;; reloadability
-(def title   lg-gltf/title)
-(def prog    lg-gltf/program-texture-light)
-(def gl-main lg-gltf/main)
+(def title   lg11/title)
+(def prog    lg11/program-source)
+(def gl-main lg11/main)
+
+;; (def title   lg20/title)
+;; (def prog    lg20/program-sky-box)
+;; (def gl-main lg20/main)
 
 (defonce app-state (atom {:live {}}))
 
@@ -76,6 +84,6 @@
         gl   (.getContext node "webgl")]
     (main*)))
 
-(set! (.-reinstallApp js/window)
+(aset js/window "reinstallApp"
       (fn []
         (main*)))

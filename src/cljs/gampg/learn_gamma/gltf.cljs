@@ -9,6 +9,8 @@
               [thi.ng.geom.core.matrix :as mat :refer [M44]])
     (:import [goog.net XhrIo]))
 
+(declare app-state)
+
 (def title
   "Loading a glTF model")
 
@@ -152,8 +154,8 @@
      u-lighting-direction [-0.25 0.25 1]
      u-directional-color  [0 0 0]
      u-use-lighting       true
+     u-light-angle        [x y z] ;;[1 1 1]
      u-diffuse            (or diffuse [1 1 0 1])
-     u-light-angle        [x y z]
      a-position           vertices
      a-vertex-normal      normals
      u-sampler            texture
@@ -179,7 +181,19 @@
   {:last-rendered 0
    :scene         {:rotation 0
                    :mv       (mat/matrix44)
-                   :p        (get-perspective-matrix width height)}})
+                   :p        (get-perspective-matrix width height)
+                   :camera   {:pitch   0
+                              :yaw     0 ;;59
+                              :x       -6.5
+                              :y       1.5
+                              :z       15 ;;-9.5
+                              :flip-y? true}
+                   :-camera   {:pitch 0
+                               :yaw   3.1
+                               :x     0
+                               :y     1.5
+                               :z     -9.5
+                               }}})
 
 (defn draw-fn [gl driver]
   (fn [state]
@@ -191,19 +205,23 @@
             texture edn]} (:scene state)
           mouse-x         (get-in state [:mouse 0] 0)
           mouse-y         (get-in state [:mouse 1] 0)
+          camera          (get-in state [:scene :camera])
           scale           (/ (get-in state [:scroll] 1000) 1000)
           gltf            (:gltf state)
           scene           (get-in gltf [:scenes (:scene gltf)])
+          primitive-id    (fn [node-name mesh index attr]
+                            (let [n (str node-name "-" (:name mesh) "-" index "-" attr)]
+                              n))
           render-node     (fn render-node [[node-name node] mv]
                             (let [mv (geom/* mv (:matrix node))]
                               (doseq [mesh (:meshes node)]
-                                (doseq [mesh (:primitives mesh)]
-                                  (let [vertices         (get-in mesh [:attributes :p])
+                                (doseq [[index mesh] (map vector (range) (:primitives mesh))]
+                                  (let [vertices         (assoc (get-in mesh [:attributes :p]) :id (primitive-id node-name mesh index :p))
                                         p-stride         (get-in mesh [:attributes :p :byteStride])
-                                        tex-coord-0      (get-in mesh [:attributes :tex-coord-0])
-                                        normals          (get-in mesh [:attributes :normal])
+                                        tex-coord-0      (assoc (get-in mesh [:attributes :tex-coord-0]) :id (primitive-id node-name mesh index :tex-coord-0))
+                                        normals          (assoc (get-in mesh [:attributes :normal]) :id (primitive-id node-name mesh index :normal))
                                         n-stride         (get-in mesh [:attributes :normal :byteStride])
-                                        indices          (get-in mesh [:indices])
+                                        indices          (assoc (get-in mesh [:indices]) :id (primitive-id node-name mesh index :indices))
                                         material         (get-in mesh [:material :values :diffuse])
                                         ;; If diffuse is a vector,
                                         ;; it's a color, otherwise if
@@ -229,23 +247,33 @@
                                                                         (:inputs program)))]
                                     ;;(js/console.log (pr-str program-name))
                                     ;; Check for normals so we don't try to draw e.g. lines right now.
-                                    (when (and diffuse normals)
+                                    ;;(js/console.log "Program: " (clj->js program-name) (clj->js scene-data))
+                                    (when (and vertices normals diffuse)
                                       (gd/draw-elements driver (gd/bind driver program
                                                                         (assoc scene-data
-                                                                               {:tag :element-index} indices))
+                                                                               {:tag :element-index
+                                                                                :id  (:name mesh)} indices))
                                                         {:draw-mode (:draw-mode mesh)
                                                          :count     draw-count})))))
                               (doseq [child (vals (:children node))]
                                 (render-node [(:name child) child] mv))))]
       (doseq [node (:nodes scene)]
-        (render-node [(:name node) node] (-> mv
-                                             (geom/translate [0 0 -7])
-                                             (geom/scale scale scale scale)
-                                             (geom/rotate-around-axis [0 1 0] (/ mouse-x 50))
-                                             (geom/rotate-around-axis [0 0 1] (- (/ mouse-y 50)))))))))
+        (let [scale (max (js/Math.abs (* rot 2)))]
+          (render-node [(:name node) node] (-> mv
+                                               (geom/rotate-around-axis [0 1 0] (- (:yaw camera)))
+                                               (geom/translate [(- (:x camera))
+                                                                (- (:y camera))
+                                                                (- (:z camera))])
+                                               ;;(geom/translate [-3 0 5.5])
+                                               (geom/rotate-around-axis [0 0 1] (if (:flip-y? camera) js/Math.PI 0))
+                                               ;;(geom/scale scale scale scale)
+                                               ;;(geom/rotate-around-axis [0 1 0] rot)
+                                               ;;(geom/rotate-around-axis [0 0 1] (- rot))
+                                               )))))))
 
 (def manual-step-frame-by-frame?
-  true)
+  false;;true
+  )
 
 (defn animate [draw-fn step-fn current-value]
   (js/requestAnimationFrame
@@ -266,14 +294,23 @@
   [time state]
   ;; We get the elapsed time since the last render to compensate for
   ;; lag, etc.
-  (let [time-now  (.getTime (js/Date.))
-        elapsed   (- time-now (:last-rendered state))
-        scroll    (.-mouseScroll js/window)]
-    (set! (.-mouseScroll js/window) 0) 
+  (let [time-now   (.getTime (js/Date.))
+        elapsed    (- time-now (:last-rendered state))
+        scroll     (.-mouseScroll js/window)
+        walk-speed (* (or (.-forward js/window) 0) 10)
+        turn-speed (* (or (.-yaw js/window) 0) 10)
+        camera     (get-in state [:scene :camera])]
+    ;;(js/console.log (pr-str [walk-speed turn-speed]))
+    (set! (.-mouseScroll js/window) 0)
+    (set! (.-forward js/window) 0)
+    (set! (.-yaw js/window) 0) 
     (-> state
         (assoc-in [:runtime :current-program] (.-mouseClick js/window))
         (assoc-in [:mouse] (.-mousePos js/window))
         (update-in [:scroll] + scroll)
+        (update-in [:scene :camera :x] (fn [x] (- x (* (js/Math.sin (:yaw camera)) walk-speed elapsed))))
+        (update-in [:scene :camera :z] (fn [z] (- z (* (js/Math.cos (:yaw camera)) walk-speed elapsed))))
+        (update-in [:scene :camera :yaw] + (* turn-speed elapsed))
         (assoc-in [:last-rendered] time-now))))
 
 (defn http-get [url cb]
@@ -282,43 +319,25 @@
                 (let [xhr (.-target e)]
                   (cb (.getResponseText xhr))))))
 
-(defn install-event-listeners! [document node starting-program]
-  (document.addEventListener "mousemove"
-                             (fn [event]
-                               (set! (.-mousePos js/window)
-                                     [(.-pageX event)
-                                      (.-pageY event)])))
-  (document.addEventListener "click"
-                             (fn [event]
-                               (set! (.-mouseClick js/window)
-                                     (inc (or (.-mouseClick js/window) starting-program)))))
-  (.addEventListener node "mousewheel"
-                     (fn [event]
-                       (.preventDefault event)
-                       (set! (.-mouseScroll js/window) (.-deltaY event)))))
-
 ;; This uses some gross global-state (js/window.mousePos,
 ;; js/window.mouseClick, js/window.mouseScroll). In a real app it
 ;; would be part of the event loop and be all local state.
 (defn main [gl node]
   (let [width            (.-clientWidth node)
         height           (.-clientHeight node)
+        state            (app-state width height)
         driver           (make-driver gl)
         starting-program 0
-        programs         {:diffuse-flat  program-diffuse-flat
-                          :diffuse-light program-diffuse-light
-                          :texture-flat  program-texture-flat
-                          :texture-light program-texture-light}
-        state            (-> (app-state width height)
-                             (assoc-in [:runtime :programs] programs)
-                             (assoc-in [:runtime :current-program] 0))]
+        programs         {:diffuse-flat  (gd/program driver program-diffuse-flat)
+                          :diffuse-light (gd/program driver program-diffuse-light)
+                          :texture-flat  (gd/program driver program-texture-flat)
+                          :texture-light (gd/program driver program-texture-light)}
+        state            (-> state
+                             (assoc-in [:runtime :programs] programs))]
     (reset-gl-canvas! node)
     (.enable gl (.-DEPTH_TEST gl))
     (.clearColor gl 0 0 0 1)
     (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
-    (set! (.-mouseClick js/window) starting-program)
-    (set! (.-mouseScroll js/window) 1000)
-    (install-event-listeners! js/document node starting-program)
     (http-get "/models/duck.gltf"
               (fn [data]
                 (set! (.-glHandle js/window) gl)
@@ -328,8 +347,75 @@
                       gltf (gltf/process-gltf edn)]
                   (set! (.-processedGLTF js/window) (clj->js gltf))
                   (set! (.-processedGLTFEDN js/window) gltf)
-                  (set! (.-debugRedraw js/window) (fn []
-                                                    (animate (draw-fn gl driver) tick (-> state
-                                                                                          (assoc-in [:gltf] gltf)))))
+                  (aset js/window "debugRedraw"
+                        (fn []
+                          (animate (draw-fn gl driver) tick (-> state
+                                                                (assoc-in [:gltf] gltf)))))
                   (animate (draw-fn gl driver) tick (-> state
-                                                        (assoc-in [:gltf] gltf))))))))
+                                                        (assoc-in [:gltf] gltf))))))
+    (let [keycodes {37 :left
+                    38 :up
+                    39 :right
+                    40 :down
+                    65 :a
+                    68 :d
+                    87 :w
+                    83 :s}]
+      (js/document.addEventListener "keydown"
+                                    (fn [event]
+                                      (let [keycode (.-which event)
+                                            key (get keycodes keycode)
+                                            directions {:w     :forward
+                                                        :up    :forward
+                                                        :s     :backward
+                                                        :down  :backward
+                                                        :a     :left
+                                                        :left  :left
+                                                        :d     :right
+                                                        :right :right}
+                                            [direction speed] (condp = key
+                                                                :w     [:forward 0.001]
+                                                                :up    [:forward 0.001]
+                                                                :a     [:yaw 0.001]
+                                                                :left  [:yaw 0.001]
+                                                                :d     [:yaw -0.001]
+                                                                :right [:yaw -0.001]
+                                                                :s     [:forward -0.001]
+                                                                :down  [:forward -0.001]
+                                                                nil)]
+                                        (when direction
+                                          (.preventDefault event)
+                                          (if (= direction :forward)
+                                            (set! (.-forward js/window) speed)
+                                            (set! (.-yaw js/window) speed))
+                                          ;;(swap! state assoc-in [:movement direction] speed)
+                                          ))))
+      (js/document.addEventListener "keyup"
+                                    (fn [event]
+                                      (let [keycode (.-which event)
+                                            key (get keycodes keycode)
+                                            directions {:w     :forward
+                                                        :up    :forward
+                                                        :s     :backward
+                                                        :down  :backward
+                                                        :a     :left
+                                                        :left  :left
+                                                        :d     :right
+                                                        :right :right}
+                                            [direction speed] (condp = key
+                                                                :w     [:forward 0.0]
+                                                                :up    [:forward 0.0]
+                                                                :a     [:yaw 0.0]
+                                                                :left  [:yaw 0.0]
+                                                                :d     [:yaw 0.0]
+                                                                :right [:yaw 0.0]
+                                                                :s     [:forward 0.0]
+                                                                :down  [:forward 0.0]
+                                                                nil)]
+                                        (when direction
+                                          (.preventDefault event)
+                                          (if (= direction :forward)
+                                            (set! (.-forward js/window) speed)
+                                            (set! (.-yaw js/window) speed))
+                                          ;;(swap! state assoc-in [:movement direction] speed)
+                                          )))))))
