@@ -275,8 +275,13 @@
                           ;; hard-coding for the duck)
                           ;; XXX: Map this over every value rather than just diffuse
                           diffuse (get-in gltf [:textures (keyword (:diffuse values))])]
+                      (js/console.log diffuse)
                       {material-name {:values (merge values
-                                                     (when diffuse {:diffuse diffuse}))
+                                                     (when diffuse {:diffuse (if (map? diffuse)
+                                                                               diffuse
+                                                                               ;; TODO: Parameterize data conversion between js<-->cljs,
+                                                                               ;; or do both and stick them in different keys
+                                                                               (clj->js diffuse))}))
                                       :name   (:name material-description)}})) (:materials gltf)))))
 
 (defn process-attr [gltf [attr-name accessor-name]]

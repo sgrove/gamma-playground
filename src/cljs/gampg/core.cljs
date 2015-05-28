@@ -11,8 +11,9 @@
             [gampg.learn-gamma.lesson-10 :as lg10]
             [gampg.learn-gamma.lesson-11 :as lg11]
             [gampg.learn-gamma.lesson-12 :as lg12]
+            [gampg.learn-gamma.lesson-13 :as lg13]
             ;;[gampg.learn-gamma.lesson-20 :as lg20]
-            ;;[gampg.learn-gamma.apartment :as lg-apartment]
+            [gampg.learn-gamma.apartment :as lg-apartment]
             [gampg.learn-gamma.gltf :as lg-gltf]
             [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]))
@@ -23,9 +24,9 @@
 ;;
 ;; XXX: We're not properly reusing gl context's here, hurts fighweel's
 ;; reloadability
-(def title   lg11/title)
-(def prog    lg11/program-source)
-(def gl-main lg11/main)
+(def title   lg-apartment/title)
+(def prog    lg-apartment/program-source)
+(def gl-main lg-apartment/main)
 
 ;; (def title   lg20/title)
 ;; (def prog    lg20/program-sky-box)
