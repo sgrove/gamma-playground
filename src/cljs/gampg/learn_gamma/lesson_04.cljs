@@ -66,93 +66,105 @@
 ;; to store the state elsewhere - in this atom, for example.
 (defn app-state [width height]
   {:last-rendered 0
-   :scene         {:pyramid-vertices [ ;; Front face
-                                      [0.0,  1.0,  0.0,]
-                                      [-1.0, -1.0,  1.0,]
-                                      [1.0, -1.0,  1.0,]
-                                      ;; Right face
-                                      [0.0,  1.0,  0.0,]
-                                      [1.0, -1.0,  1.0,]
-                                      [1.0, -1.0, -1.0,]
-                                      ;; Back face
-                                      [0.0,  1.0,  0.0,]
-                                      [1.0, -1.0, -1.0,]
-                                      [-1.0, -1.0, -1.0,]
-                                      ;; Left face
-                                      [0.0,  1.0,  0.0,]
-                                      [-1.0, -1.0, -1.0,]
-                                      [-1.0, -1.0,  1.0]]
-                   :pyramid-colors   [ ;; Front face
-                                      [1.0, 0.0, 0.0, 1.0,]
-                                      [0.0, 1.0, 0.0, 1.0,]
-                                      [0.0, 0.0, 1.0, 1.0,]
-                                      ;; Right face
-                                      [1.0, 0.0, 0.0, 1.0,]
-                                      [0.0, 0.0, 1.0, 1.0,]
-                                      [0.0, 1.0, 0.0, 1.0,]
-                                      ;; Back face
-                                      [1.0, 0.0, 0.0, 1.0,]
-                                      [0.0, 1.0, 0.0, 1.0,]
-                                      [0.0, 0.0, 1.0, 1.0,]
-                                      ;; Left face
-                                      [1.0, 0.0, 0.0, 1.0,]
-                                      [0.0, 0.0, 1.0, 1.0,]
-                                      [0.0, 1.0, 0.0, 1.0]]
+   :scene         {:pyramid-vertices {:data [ ;; Front face
+                                             [0.0,  1.0,  0.0,]
+                                             [-1.0, -1.0,  1.0,]
+                                             [1.0, -1.0,  1.0,]
+                                             ;; Right face
+                                             [0.0,  1.0,  0.0,]
+                                             [1.0, -1.0,  1.0,]
+                                             [1.0, -1.0, -1.0,]
+                                             ;; Back face
+                                             [0.0,  1.0,  0.0,]
+                                             [1.0, -1.0, -1.0,]
+                                             [-1.0, -1.0, -1.0,]
+                                             ;; Left face
+                                             [0.0,  1.0,  0.0,]
+                                             [-1.0, -1.0, -1.0,]
+                                             [-1.0, -1.0,  1.0]]
+                                      :immutable? true
+                                      :id :pyramid-vertices}
+                   :pyramid-colors {:data  [ ;; Front face
+                                            [1.0, 0.0, 0.0, 1.0,]
+                                            [0.0, 1.0, 0.0, 1.0,]
+                                            [0.0, 0.0, 1.0, 1.0,]
+                                            ;; Right face
+                                            [1.0, 0.0, 0.0, 1.0,]
+                                            [0.0, 0.0, 1.0, 1.0,]
+                                            [0.0, 1.0, 0.0, 1.0,]
+                                            ;; Back face
+                                            [1.0, 0.0, 0.0, 1.0,]
+                                            [0.0, 1.0, 0.0, 1.0,]
+                                            [0.0, 0.0, 1.0, 1.0,]
+                                            ;; Left face
+                                            [1.0, 0.0, 0.0, 1.0,]
+                                            [0.0, 0.0, 1.0, 1.0,]
+                                            [0.0, 1.0, 0.0, 1.0]]
+                                    :immutable? true
+                                    :id :pyramid-colors}
                    :pyramid-rotation 0
-                   :cube-vertices    [ ;; Front face
-                                      [-1.0 -1.0  1.0]
-                                      [1.0 -1.0  1.0]
-                                      [1.0  1.0  1.0]
-                                      [-1.0  1.0  1.0]
-                                      
-                                      ;; Back face
-                                      [-1.0 -1.0 -1.0]
-                                      [-1.0  1.0 -1.0]
-                                      [1.0  1.0 -1.0]
-                                      [1.0 -1.0 -1.0]
-                                      
-                                      ;; Top face
-                                      [-1.0  1.0 -1.0]
-                                      [-1.0  1.0  1.0]
-                                      [1.0  1.0  1.0]
-                                      [1.0  1.0 -1.0]
-                                      
-                                      ;; Bottom face
-                                      [-1.0 -1.0 -1.0]
-                                      [1.0 -1.0 -1.0]
-                                      [1.0 -1.0  1.0]
-                                      [-1.0 -1.0  1.0]
-                                      
-                                      ;; Right face
-                                      [1.0 -1.0 -1.0]
-                                      [1.0  1.0 -1.0]
-                                      [1.0  1.0  1.0]
-                                      [1.0 -1.0  1.0]
-                                      
-                                      ;; Left face
-                                      [-1.0 -1.0 -1.0]
-                                      [-1.0 -1.0  1.0]
-                                      [-1.0  1.0  1.0]
-                                      [-1.0  1.0 -1.0]]
-                   :cube-colors      (vec (mapcat identity
-                                                  [(repeat 4 [1.0, 0.0, 0.0, 1.0]), ;; Front face
-                                                   (repeat 4 [1.0, 1.0, 0.0, 1.0]), ;; Back face
-                                                   (repeat 4 [0.0, 1.0, 0.0, 1.0]), ;; Top face
+                   :cube-vertices    {:data [ ;; Front face
+                                             [-1.0 -1.0  1.0]
+                                             [1.0 -1.0  1.0]
+                                             [1.0  1.0  1.0]
+                                             [-1.0  1.0  1.0]
+                                             
+                                             ;; Back face
+                                             [-1.0 -1.0 -1.0]
+                                             [-1.0  1.0 -1.0]
+                                             [1.0  1.0 -1.0]
+                                             [1.0 -1.0 -1.0]
+                                             
+                                             ;; Top face
+                                             [-1.0  1.0 -1.0]
+                                             [-1.0  1.0  1.0]
+                                             [1.0  1.0  1.0]
+                                             [1.0  1.0 -1.0]
+                                             
+                                             ;; Bottom face
+                                             [-1.0 -1.0 -1.0]
+                                             [1.0 -1.0 -1.0]
+                                             [1.0 -1.0  1.0]
+                                             [-1.0 -1.0  1.0]
+                                             
+                                             ;; Right face
+                                             [1.0 -1.0 -1.0]
+                                             [1.0  1.0 -1.0]
+                                             [1.0  1.0  1.0]
+                                             [1.0 -1.0  1.0]
+                                             
+                                             ;; Left face
+                                             [-1.0 -1.0 -1.0]
+                                             [-1.0 -1.0  1.0]
+                                             [-1.0  1.0  1.0]
+                                             [-1.0  1.0 -1.0]]
+                                      :immutable? true
+                                      :id :cube-vertices}
+                   :cube-colors      {:data (vec (mapcat identity
+                                                         [(repeat 4 [1.0, 0.0, 0.0, 1.0]), ;; Front face
+                                                          (repeat 4 [1.0, 1.0, 0.0, 1.0]), ;; Back face
+                                                          (repeat 4 [0.0, 1.0, 0.0, 1.0]), ;; Top face
 
-                                                   (repeat 4 [1.0, 0.5, 0.5, 1.0]), ;; Bottom face
-                                                   (repeat 4 [1.0, 0.0, 1.0, 1.0]), ;; Right face
-                                                   (repeat 4 [0.0, 0.0, 1.0, 1.0]), ;; Left face
-                                                   ]))
-                   :cube-indices     [0  1  2     0  2  3  ;; Front face
-                                      4  5  6     4  6  7  ;; Back face
-                                      8  9  10    8 10 11  ;; Top face
-                                      12 13 14   12 14 15  ;; Bottom face
-                                      16 17 18   16 18 19  ;; Right face
-                                      20 21 22   20 22 23;;
-                                      ] ;; Left face
+                                                          (repeat 4 [1.0, 0.5, 0.5, 1.0]), ;; Bottom face
+                                                          (repeat 4 [1.0, 0.0, 1.0, 1.0]), ;; Right face
+                                                          (repeat 4 [0.0, 0.0, 1.0, 1.0]), ;; Left face
+                                                          ]))
+                                      :immutable? true
+                                      :id :cube-colors}
+                   :cube-indices     {:data [0  1  2     0  2  3 ;; Front face
+                                             4  5  6     4  6  7 ;; Back face
+                                             8  9  10    8 10 11 ;; Top face
+                                             12 13 14   12 14 15 ;; Bottom face
+                                             16 17 18   16 18 19 ;; Right face
+                                             20 21 22   20 22 23 ;;
+                                             ]
+                                      :immutable? true
+                                      :id :cube-indices} ;; Left face
                    :cube-rotation    0
                    :mv               (mat/matrix44)
-                   :p                (get-perspective-matrix width height)}})
+                   :p                {:data (get-perspective-matrix width height)
+                                      :immutable? true
+                                      :id :p}}})
 
 (defn draw-fn [gl driver program]
   (fn [state]
@@ -206,7 +218,7 @@
   (let [width     (.-clientWidth node)
         height    (.-clientHeight node)
         driver    (make-driver gl)
-        program   program-source
+        program   (gd/program driver program-source)
         state (app-state width height)]
     (set! (.-debugRedrawScene js/window)
           (fn []
