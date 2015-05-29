@@ -9,6 +9,10 @@ Currently lessons 1-10 are ported. Please feel free to take a shot at porting th
 ## Warning
 Please don't take the state of this code as finished - feel free to clean it up, send pull requests, and open issues. This should become a highly-polished introduction to gamma, from beginner usage to advanced.
 
+## Further warning
+
+This code is in *heavy* flux as both usage of Gamma and Gamma Driver, and the projects themselves, are ironed out. Examples may be slightly broken or slow at any given time until all three projects settle down a bit. Feel free to open an issue if one of the examples doesn't work, with a detailed list of repro-steps.
+
 ## Development
 
 Open a terminal and type `lein repl` to start a Clojure REPL
