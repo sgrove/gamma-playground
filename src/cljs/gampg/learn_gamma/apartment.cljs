@@ -153,6 +153,18 @@
 (def u-light-angle
   (g/uniform "uLightAngle" :vec3))
 
+(def u-point-lighting-location
+  (g/uniform "uPointLightingLocation" :vec3))
+
+(def u-point-lighting-color
+  (g/uniform "uPointLightingColor" :vec3))
+
+(def v-transformed-normal
+  (g/varying "vTransformedNormal" :vec3 :mediump))
+
+(def v-position
+  (g/varying "vPosition" :vec4 :highp))
+
 (def program-diffuse-flat
   (p/program
    {:vertex-shader   {(g/gl-position) (-> u-p-matrix
@@ -208,6 +220,37 @@
                        {(g/gl-frag-color) l-color})
     :precision {:float :mediump}}))
 
+(def program-diffuse-per-fragment
+  (p/program
+   {:vertex-shader   {v-position           (g/* u-mv-matrix (g/vec4 a-position 1))
+                      (g/gl-position)      (g/* u-p-matrix v-position)
+                      v-transformed-normal (g/* u-n-matrix a-vertex-normal)}
+    :fragment-shader (let [light-direction           (g/normalize (g/- u-point-lighting-location (g/swizzle v-position :xyz)))
+                           direction-light-weighting (g/max (g/dot (g/normalize v-transformed-normal) light-direction) 0)
+                           light-weighting           (g/* (g/+ u-ambient-color u-point-lighting-color)
+                                                          direction-light-weighting)
+                           l-diffuse                 u-diffuse
+                           a                         (g/swizzle l-diffuse :a)
+                           rgb                       (g/* (g/swizzle l-diffuse :rgb) light-weighting)]
+                       {(g/gl-frag-color) (g/vec4 rgb (g/swizzle l-diffuse :a))})
+    :precision       {:float :mediump}}))
+
+(def program-texture-per-fragment
+  (p/program
+   {:vertex-shader   {v-position           (g/* u-mv-matrix (g/vec4 a-position 1))
+                      (g/gl-position)      (g/* u-p-matrix v-position)
+                      v-texture-coord      a-tex-coord-0
+                      v-transformed-normal (g/* u-n-matrix a-vertex-normal)}
+    :fragment-shader (let [light-direction           (g/normalize (g/- u-point-lighting-location (g/swizzle v-position :xyz)))
+                           direction-light-weighting (g/max (g/dot (g/normalize v-transformed-normal) light-direction) 0)
+                           light-weighting           (g/* (g/+ u-ambient-color u-point-lighting-color)
+                                                          direction-light-weighting)
+                           texture-color             (g/texture2D u-sampler (g/vec2 (g/swizzle v-texture-coord :st)))
+                           a                         (g/swizzle texture-color :a)
+                           rgb                       (g/* (g/swizzle texture-color :rgb) light-weighting)]
+                       {(g/gl-frag-color) (g/vec4 rgb (g/swizzle texture-color :a))})
+    :precision {:float :mediump}}))
+
 (def u-sky-box-inverse-mv-matrix
   (g/uniform "uSkyBoxInverseMVMatrix" :mat4))
 
@@ -259,7 +302,7 @@
                                                                       (boolean vertices)
                                                                       (boolean normals)]))
   (let [[x y z] [(js/Math.sin now)
-                 (js/Math.cos now)
+                 5;;(js/Math.cos now)
                  (js/Math.sin (* now 2))]]
     {u-p-matrix           (object-array p)
      u-mv-matrix          (object-array mv)
@@ -267,8 +310,10 @@
      u-ambient-color      #js [0.5 0.5 0.5]
      u-lighting-direction #js [-0.25 0.25 1]
      u-directional-color  #js [0 0 0]
+     u-point-lighting-location #js[x y z]
+     u-point-lighting-color #js[0.8 0.8 0.8]
      u-use-lighting       true
-     u-light-angle        #js [x y z] ;;[1 1 1]
+     u-light-angle        #js [x y z]
      u-diffuse            (or diffuse [1 1 0 1])
      a-position           vertices
      a-vertex-normal      normals
@@ -391,8 +436,8 @@
                                       sampler          (:sampler material)
                                       draw-count       (:count indices)
                                       program-name     (if texture-program?
-                                                         :texture-light
-                                                         :diffuse-light)
+                                                         :texture-per-fragment-light
+                                                         :diffuse-per-fragment-light)
                                       program          (get-in state [:runtime :programs program-name])
                                       scene-data       (when normals
                                                          (select-keys (get-data now
@@ -587,11 +632,13 @@
         height           (.-clientHeight node)
         driver           (make-driver gl)
         starting-program 0
-        programs         {:diffuse-flat  (gd/program driver program-diffuse-flat)
-                          :diffuse-light (gd/program driver program-diffuse-light)
-                          :texture-flat  (gd/program driver program-texture-flat)
-                          :texture-light (gd/program driver program-texture-light)
-                          :sky-box       (gd/program driver program-sky-box)}
+        programs         {:diffuse-flat               (gd/program driver program-diffuse-flat)
+                          :diffuse-light              (gd/program driver program-diffuse-light)
+                          :texture-flat               (gd/program driver program-texture-flat)
+                          :texture-light              (gd/program driver program-texture-light)
+                          :diffuse-per-fragment-light (gd/program driver program-diffuse-per-fragment)
+                          :texture-per-fragment-light (gd/program driver program-texture-per-fragment)
+                          :sky-box                    (gd/program driver program-sky-box)}
         now              (.getTime (js/Date.))
         app-state        (-> (app-state width height gl node now)
                              (update-in [:comms] merge {:controls controls
