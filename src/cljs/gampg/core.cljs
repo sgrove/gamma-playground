@@ -12,6 +12,8 @@
             [gampg.learn-gamma.lesson-11 :as lg11]
             [gampg.learn-gamma.lesson-12 :as lg12]
             [gampg.learn-gamma.lesson-13 :as lg13]
+            [gampg.learn-gamma.lesson-14 :as lg14]
+            [gampg.learn-gamma.lesson-15 :as lg15]
             ;;[gampg.learn-gamma.lesson-20 :as lg20]
             [gampg.learn-gamma.apartment :as lg-apartment]
             [gampg.learn-gamma.gltf :as lg-gltf]
@@ -24,13 +26,13 @@
 ;;
 ;; XXX: We're not properly reusing gl context's here, hurts fighweel's
 ;; reloadability
-(def title   lg-apartment/title)
-(def prog    lg-apartment/program-source)
-(def gl-main lg-apartment/main)
+;; (def title   lg-apartment/title)
+;; (def prog    lg-apartment/program-diffuse-per-fragment)
+;; (def gl-main lg-apartment/main)
 
-;; (def title   lg20/title)
-;; (def prog    lg20/program-sky-box)
-;; (def gl-main lg20/main)
+(def title   lg14/title)
+(def prog    lg14/program-specular)
+(def gl-main lg14/main)
 
 (defonce app-state (atom {:live {}}))
 
@@ -76,13 +78,12 @@
                                         (get-in prog [:fragment-shader :glsl])))))))
      app-state
      {:target (. js/document (getElementById "app"))})
-    (gl-main gl node)))
+    (gl-main node)))
 
 ;; Temporarily here for debugging
 
 (defn main []
-  (let [node (js/document.getElementById "glcanvas")
-        gl   (.getContext node "webgl")]
+  (let [node (js/document.getElementById "glcanvas")]
     (main*)))
 
 (aset js/window "reinstallApp"
