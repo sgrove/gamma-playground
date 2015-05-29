@@ -483,7 +483,7 @@
 (def manual-step-frame-by-frame?
   (do
     true
-    false
+    ;;false
     ))
 
 (defn animate-pure [draw-fn step-fn current-value]
@@ -523,13 +523,6 @@
                                                       (* (js/Math.cos (+ half-pi (:yaw camera))) delta-strafe elapsed)))))
         (assoc-in [:last-rendered] time-now)
         (assoc :now time-now))))
-
-(defn http-get [url cb]
-  (XhrIo.send (str url)
-              (fn [e]
-                (let [xhr (.-target e)]
-                  (cb (.getResponseText xhr))))))
-
 
 (defmulti control-event
   (fn [message args state] message))
@@ -631,7 +624,6 @@
         width            (.-clientWidth node)
         height           (.-clientHeight node)
         driver           (make-driver gl)
-        starting-program 0
         programs         {:diffuse-flat               (gd/program driver program-diffuse-flat)
                           :diffuse-light              (gd/program driver program-diffuse-light)
                           :texture-flat               (gd/program driver program-texture-flat)
@@ -649,30 +641,29 @@
         watch-key        (gensym)]
 
     (reset-gl-canvas! node)
-    (.enable gl (.-DEPTH_TEST gl))
-    (.clearColor gl 0 0 0 1)
-    (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
+    (doto gl
+      (.enable (.-DEPTH_TEST gl))
+      (.clearColor 0 0 0 1)
+      (.clear (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl))))
 
     (go
       (let [texture-ch (chan)
-            scene-ch   (chan)]
-        (utils/load-cube-map gl "/images/skybox/citadella"
-                             (fn [cube-texture]
-                               (let [cube-texture (assoc cube-texture :immutable? true)]
-                                 (put! texture-ch {:cube-texture cube-texture}))))
-        (http-get "/models/apartment_2.gltf"
-                  (fn [data]
-                    (let [json (js/JSON.parse data)
-                          edn  (js->clj json :keywordize-keys true)
-                          gltf (gltf/process-gltf edn)]
-                      (set! (.-processedGLTF js/window) (clj->js gltf))
-                      (put! scene-ch gltf))))
-        (let [skybox    (<! texture-ch)
-              scene     (<! scene-ch)
-              app-state (-> app-state
-                            (assoc-in [:skybox :texture] (:cube-texture skybox))
-                            (assoc-in [:gltf] scene)
-                            atom)]
-          (main* app-state {:comms {:stop     stop
-                                    :controls controls
-                                    :keyboard keyboard}}))))))
+            scene-ch   (chan)
+            _          (utils/load-cube-map gl "/images/skybox/citadella" #(put! texture-ch %))
+            _          (utils/http-get "/models/apartment_2.gltf" #(put! scene-ch (-> (js/JSON.parse %)
+                                                                                      (js->clj :keywordize-keys true)
+                                                                                      (gltf/process-gltf))))
+            skybox     (<! texture-ch)
+            scene      (<! scene-ch)
+            app-state  (-> app-state
+                           (assoc-in [:skybox :texture] (assoc skybox :immutable? true))
+                           (assoc-in [:gltf] scene)
+                           atom)
+            next-tick  (fn []
+                         (main* app-state {:comms {:stop     stop
+                                                   :controls controls
+                                                   :keyboard keyboard}}))]
+        (aset js/window "processedGLTF" (clj->js scene))
+        (if manual-step-frame-by-frame?
+          (set! (.-tick js/window) next-tick)
+          (next-tick))))))
