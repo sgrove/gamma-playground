@@ -26,13 +26,13 @@
 ;;
 ;; XXX: We're not properly reusing gl context's here, hurts fighweel's
 ;; reloadability
-;; (def title   lg-apartment/title)
-;; (def prog    lg-apartment/program-diffuse-per-fragment)
-;; (def gl-main lg-apartment/main)
+(def title   lg-apartment/title)
+(def prog    lg-apartment/program-diffuse-per-fragment)
+(def gl-main lg-apartment/main)
 
-(def title   lg14/title)
-(def prog    lg14/program-specular)
-(def gl-main lg14/main)
+;; (def title   lg14/title)
+;; (def prog    lg14/program-specular)
+;; (def gl-main lg14/main)
 
 (defonce app-state (atom {:live {}}))
 
