@@ -1,7 +1,8 @@
 (ns gampg.utils
   (:require [goog.webgl :as ggl]
             [thi.ng.geom.core :as geom]
-            [thi.ng.geom.core.matrix :as mat :refer [M44]]))
+            [thi.ng.geom.core.matrix :as mat :refer [M44]])
+  (:import [goog.net XhrIo]))
 
 ;; Note this is bad form in production, it can't be optimized away
 ;; https://groups.google.com/d/msg/clojurescript/3QmukS-q9kw/v9dnXfWhGm8J
@@ -297,6 +298,18 @@
    0x8b31     :vertex-shader
    0x0ba2     :viewport
    0          :zero})
+
+(defn http-get [url cb]
+  (XhrIo.send (str url)
+              (fn [e]
+                (let [xhr (.-target e)]
+                  (cb (.getResponseText xhr))))))
+
+(defn load-texture! [src cb]
+  (let [image (js/Image.)]
+    (aset image "onload"
+          (cb image))
+    (aset image "src" src)))
 
 (defn load-cube-map [gl base cb]
   (let [loader  (atom [[0 (str base "/" "posx.jpg") false]
