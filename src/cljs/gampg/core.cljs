@@ -26,14 +26,13 @@
 ;;
 ;; XXX: We're not properly reusing gl context's here, hurts fighweel's
 ;; reloadability
-(def title   lg-apartment/title)
-(def prog    lg-apartment/program-diffuse-per-fragment)
-(def gl-main lg-apartment/main)
+(def title     lg-apartment/title)
+(def gl-main   lg-apartment/main)
+(def prog      lg-apartment/program-sky-box)
 
 ;; (def title   lg14/title)
 ;; (def prog    lg14/program-specular)
 ;; (def gl-main lg14/main)
-
 (defonce app-state (atom {:live {}}))
 
 (defn canvas [data owner opts]
@@ -62,6 +61,7 @@
            (dom/div nil
                     (dom/h2 #js{:onClick (fn [event] (om/transact! app :reverse? not))}
                             title)
+                    (dom/pre nil (pr-str (get-in app [:scene :camera])))
                     (dom/small nil
                                (dom/pre #js{:style #js{:float "left"
                                                        :borderRight "1px dotted black"
@@ -78,7 +78,7 @@
                                         (get-in prog [:fragment-shader :glsl])))))))
      app-state
      {:target (. js/document (getElementById "app"))})
-    (gl-main node)))
+    (gl-main app-state node)))
 
 ;; Temporarily here for debugging
 

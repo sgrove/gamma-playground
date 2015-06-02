@@ -2,6 +2,8 @@
   (:require [clojure.string :as s]
             [gampg.utils :as utils]
             [goog.crypt.base64 :as b64]
+            [thi.ng.geom.core :as geom]
+            [thi.ng.geom.core.vector :as vec]
             [thi.ng.geom.core.matrix :as mat :refer [M44]]))
 
 ;; Helper namespace for processing a gltf file. Note that this only
@@ -275,7 +277,6 @@
                           ;; hard-coding for the duck)
                           ;; XXX: Map this over every value rather than just diffuse
                           diffuse (get-in gltf [:textures (keyword (:diffuse values))])]
-                      (js/console.log diffuse)
                       {material-name {:values (merge values
                                                      (when diffuse {:diffuse (if (map? diffuse)
                                                                                diffuse
@@ -306,7 +307,7 @@
                     {mesh-name (assoc mesh-description
                                       :primitives
                                       (let [primitives (:primitives mesh-description)]
-                                        (map (fn [primitive]
+                                        (mapv (fn [primitive]
                                                (let [attrs (reduce merge {} (mapv (partial process-attr gltf) (:attributes primitive)))
                                                      indices (merge (get-in gltf [:accessors (keyword (:indices primitive))])
                                                                     {:accessor-name (keyword (:indices primitive))
@@ -321,29 +322,34 @@
                   (:meshes gltf)))))
 
 (defn process-nodes [gltf]
-  (let [nodes (:nodes gltf)]
+  (let [nodes   (:nodes gltf)
+        root-mv (mat/matrix44)]
     (assoc gltf :nodes
            (reduce merge {}
-                   (map (fn helper [[node-name node-description]]
-                          (let [children (reduce merge {} (mapv (fn [child-name]
-                                                                 (helper [child-name (get-in gltf [:nodes (keyword child-name)])])) (:children node-description)))
-                                meshes   (map #(get-in gltf [:meshes (keyword %)]) (:meshes node-description))
-                                ;; TODO: Parameterize constructors so
-                                ;; caller can decide on hydrated data
-                                ;; structure
-                                matrix   (mat/matrix44 (js->clj (:matrix node-description)))
-                                node     (assoc node-description
-                                                :children children
-                                                :meshes meshes
-                                                :matrix matrix)]
-                            {node-name node})) nodes)))))
+                   (map (partial (fn helper [current-mv [node-name node-description]]
+                             (let [ ;; TODO: Parameterize constructors so
+                                   ;; caller can decide on hydrated data
+                                   ;; structure
+                                   original-matrix    (mat/matrix44 (js->clj (:matrix node-description)))
+                                   transformed-matrix (geom/* (or current-mv root-mv)
+                                                              original-matrix)
+                                   meshes             (mapv #(get-in gltf [:meshes (keyword %)]) (:meshes node-description))
+                                   children           (reduce merge {}
+                                                              (mapv (fn [child-name]
+                                                                      (helper transformed-matrix [child-name (get-in gltf [:nodes (keyword child-name)])])) (:children node-description)))
+                                   node               (assoc node-description
+                                                             :children children
+                                                             :meshes meshes
+                                                             :matrix original-matrix
+                                                             :transformed-matrix transformed-matrix)]
+                               {(keyword node-name) node})) root-mv) nodes)))))
 
 (defn process-scenes [gltf]
   (let [scenes (:scenes gltf)]
     (assoc gltf :scenes
            (reduce merge {}
                    (map (fn [[scene-name scene-description]]
-                          (let [nodes (map #(get-in gltf [:nodes (keyword %)]) (:nodes scene-description))]
+                          (let [nodes (mapv #(get-in gltf [:nodes (keyword %)]) (:nodes scene-description))]
                             {scene-name (assoc scene-description
                                                :nodes nodes)})) scenes)))))
 

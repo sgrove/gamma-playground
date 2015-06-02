@@ -275,8 +275,9 @@
         (update-in [:scene :cube-rotation] + cube-diff)
         (assoc-in [:last-rendered] time-now))))
 
-(defn main [gl node]  
-  (let [width   (.-clientWidth node)
+(defn main [node]
+  (let [gl      (.getContext node "webgl")
+        width   (.-clientWidth node)
         height  (.-clientHeight node)
         driver  (driver/basic-driver gl)
         program program-source

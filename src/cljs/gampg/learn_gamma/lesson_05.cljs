@@ -193,12 +193,13 @@
         (update-in [:scene :cube-rotation] + cube-diff)
         (assoc-in [:last-rendered] time-now))))
 
-(defn main [gl node]  
-  (let [width     (.-clientWidth node)
-        height    (.-clientHeight node)
-        driver    (make-driver gl)
-        program   program-source
-        state (app-state width height)]
+(defn main [node]  
+  (let [gl      (.getContext node "webgl")
+        width   (.-clientWidth node)
+        height  (.-clientHeight node)
+        driver  (make-driver gl)
+        program program-source
+        state   (app-state width height)]
     (reset-gl-canvas! node)
     (.enable gl (.-DEPTH_TEST gl))
     (.clearColor gl 0 0 0 1)

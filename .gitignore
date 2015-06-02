@@ -14,3 +14,8 @@ yaks
 .DS_Store
 .idea
 .repl*
+resources/public/advanced
+resources/public/images/apartment
+resources/public/models/*.dae
+resources/public/models/apartment_2/**
+resources/public/models/corner_couch

@@ -311,13 +311,13 @@
           (cb image))
     (aset image "src" src)))
 
-(defn load-cube-map [gl base cb]
-  (let [loader  (atom [[0 (str base "/" "posx.jpg") false]
-                       [1 (str base "/" "negx.jpg") false]
-                       [2 (str base "/" "posy.jpg") false]
-                       [3 (str base "/" "negy.jpg") false]
-                       [4 (str base "/" "posz.jpg") false]
-                       [5 (str base "/" "negz.jpg") false]])]
+(defn load-cube-map [gl base image-extension filter wrap cb]
+  (let [loader  (atom [[0 (str base "/" "posx." image-extension) false]
+                       [1 (str base "/" "negx." image-extension) false]
+                       [2 (str base "/" "posy." image-extension) false]
+                       [3 (str base "/" "negy." image-extension) false]
+                       [4 (str base "/" "posz." image-extension) false]
+                       [5 (str base "/" "negz." image-extension) false]])]
     (doseq [[n src] @loader]
       (let [img (js/Image.)]
         (set! (.-onload img) ((fn [image]
@@ -327,13 +327,13 @@
                                                                           [n src img]))))
                                   (when (every? last @loader)
                                     (let [faces @loader
-                                          final {:faces {:x [(last (nth faces 0))
-                                                             (last (nth faces 1))]
-                                                         :y [(last (nth faces 2))
-                                                             (last (nth faces 3))]
-                                                         :z [(last (nth faces 4))
-                                                             (last (nth faces 5))]}
-                                                 :filter {:min :linear
-                                                          :mag :linear}}]
+                                          final {:faces  {:x [(last (nth faces 0))
+                                                              (last (nth faces 1))]
+                                                          :y [(last (nth faces 2))
+                                                              (last (nth faces 3))]
+                                                          :z [(last (nth faces 4))
+                                                              (last (nth faces 5))]}
+                                                 :filter filter
+                                                 :wrap   wrap}]
                                       (cb final))))) img))
         (set! (.-src img) src)))))

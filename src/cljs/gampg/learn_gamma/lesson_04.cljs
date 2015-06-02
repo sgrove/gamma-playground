@@ -213,13 +213,13 @@
         (update-in [:scene :cube-rotation] + cube-diff)
         (assoc-in [:last-rendered] time-now))))
 
-(defn main [gl node]
-  
-  (let [width     (.-clientWidth node)
-        height    (.-clientHeight node)
-        driver    (make-driver gl)
-        program   (gd/program driver program-source)
-        state (app-state width height)]
+(defn main [node]
+  (let [gl      (.getContext node "webgl")
+        width   (.-clientWidth node)
+        height  (.-clientHeight node)
+        driver  (make-driver gl)
+        program (gd/program driver program-source)
+        state   (app-state width height)]
     (set! (.-debugRedrawScene js/window)
           (fn []
             (animate (draw-fn gl driver program) tick state)))

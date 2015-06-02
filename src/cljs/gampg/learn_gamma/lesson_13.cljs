@@ -319,7 +319,7 @@
 (def manual-step-frame-by-frame?
   (do
     true
-    ;;false
+    false
     ))
 
 (defn animate [draw-fn step-fn current-value]
@@ -414,8 +414,7 @@
                                    :flip-y     true
                                    :immutable? true}
                         next-tick (fn [] (animate (draw-fn gl driver programs) tick (-> state
-                                                                                       (assoc-in [:scene :texture] texture)
-                                                                                       (assoc-in [:scene :model] model))))]
+                                                                                       (assoc-in [:scene :texture] texture))))]
                     (if manual-step-frame-by-frame?
                       (set! (.-tick js/window) next-tick)
                       (animate (draw-fn gl driver programs) tick (assoc-in state [:scene :texture] texture))))))

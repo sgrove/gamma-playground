@@ -94,14 +94,18 @@
   (let [star-count 50]
     {:last-rendered (.getTime (js/Date.))
      :scene         {:stars (map (partial make-star star-count) (range star-count))
-                     :star-vertices [[-1.0, -1.0,  0.0,]
-                                     [1.0, -1.0,  0.0,]
-                                     [-1.0,  1.0,  0.0,]
-                                     [1.0,  1.0,  0.0]]
-                     :star-texture-coords [0.0, 0.0,
-                                           1.0, 0.0,
-                                           0.0, 1.0,
-                                           1.0, 1.0]
+                     :star-vertices {:id         :star-vertices
+                                     :data       [[-1.0, -1.0,  0.0,]
+                                                  [1.0, -1.0,  0.0,]
+                                                  [-1.0,  1.0,  0.0,]
+                                                  [1.0,  1.0,  0.0]]
+                                     :immutable? true}
+                     :star-texture-coords {:id :star-texture-coords
+                                           :data [0.0, 0.0,
+                                                  1.0, 0.0,
+                                                  0.0, 1.0,
+                                                  1.0, 1.0]
+                                           :immutable? true}
                      :mv    (mat/matrix44)
                      :p     (get-perspective-matrix width height)}}))
 
@@ -157,8 +161,9 @@
         (update-in [:scene :stars] (fn [stars] (mapv (partial move-star elapsed) stars)))
         (assoc-in [:last-rendered] time-now))))
 
-(defn main [gl node]  
-  (let [width   (.-clientWidth node)
+(defn main [node]
+  (let [gl      (.getContext node "webgl")
+        width   (.-clientWidth node)
         height  (.-clientHeight node)
         driver  (driver/basic-driver gl)
         program program-source

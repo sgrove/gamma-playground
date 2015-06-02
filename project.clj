@@ -63,7 +63,7 @@
                                   ;;[com.cemerick/piggieback "0.1.3"]
                                   [com.cemerick/piggieback "0.2.1"]
                                   ;;[weasel "0.4.2"]
-                                  [weasel "0.6.0"]
+                                  [weasel "0.7.0-SNAPSHOT"]
                                   [org.clojure/tools.nrepl "0.2.10"]
                                   ]
 
@@ -72,11 +72,13 @@
 
                    :plugins [ ;;[lein-figwheel "0.2.1-SNAPSHOT"]
                              [lein-figwheel "0.3.3"]
-                             ]
+                             [cider/cider-nrepl "0.9.0-SNAPSHOT"]
+                             [refactor-nrepl "1.0.5"]
 
                    :figwheel {:http-server-root "public"
-                              :server-port 3449
-                              :css-dirs ["resources/public/css"]}
+                              :server-port      3449
+                              :nrepl-port       7888
+                              :css-dirs         ["resources/public/css"]}
 
                    :env {:is-dev true}
 
@@ -98,7 +100,8 @@
                                                               :optimizations :advanced
                                                               ;;:pretty-print  true
                                                               :preamble      ["react/react.min.js"]
-                                                              :externs       ["react/externs/react.js"]
+                                                              :externs       ["react/externs/react.js"
+                                                                              "resources/externs/webvr.js"]
                                                               }}}}}
 
              :uberjar {:source-paths ["env/prod/clj"]
