@@ -15,7 +15,7 @@
 
 (defroutes routes
   (resources "/")
-  (resources "/react" {:root "react"})
+  (resources "/react" {:root "cljsjs/development"})
   (GET "/*" req (page)))
 
 (def http-handler

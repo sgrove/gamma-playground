@@ -14,7 +14,7 @@
   (comp
      (set-attr :class "is-dev")
      (prepend (html [:script {:type "text/javascript" :src "/js/out/goog/base.js"}]))
-     (prepend (html [:script {:type "text/javascript" :src "/react/react.js"}]))
+     (prepend (html [:script {:type "text/javascript" :src "/react/react.inc.js"}]))
      (append  (html [:script {:type "text/javascript"} "goog.require('gampg.main')"]))))
 
 (defn browser-repl []

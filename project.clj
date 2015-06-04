@@ -9,19 +9,21 @@
 
   :test-paths ["spec/clj"]
 
-  :dependencies [[org.clojure/clojure "1.7.0-beta2"]
+  :dependencies [[cljsjs/react "0.13.3-0"]
+                 [compojure "1.3.1"]
+                 [enlive "1.1.5"]
+                 [environ "1.0.0"]
+                 [fipp "0.6.2"]
+                 [instaparse "1.4.0"]
+                 [markdown-clj "0.9.66"]
+                 [org.omcljs/om "0.8.8"]
+                 [org.clojure/clojure "1.7.0-beta2"]
                  [org.clojure/clojurescript "0.0-3291"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [org.clojure/google-closure-library "0.0-20150505-021ed5b3"]
                  [org.clojure/google-closure-library-third-party "0.0-20150505-021ed5b3"]
-                 [instaparse "1.4.0"]
-                 [fipp "0.6.2"]
                  [ring "1.3.2"]
                  [ring/ring-defaults "0.1.3"]
-                 [compojure "1.3.1"]
-                 [enlive "1.1.5"]
-                 [om "0.8.0-rc1"]
-                 [environ "1.0.0"]
                  [thi.ng/geom "0.0.783"  :exclusions [com.google.guava/guava
                                                       com.google.javascript/closure-compiler
                                                       org.clojure/clojure
@@ -40,14 +42,14 @@
                              :compiler {:output-to     "resources/public/js/app.js"
                                         :output-dir    "resources/public/js/out"
                                         :source-map    "resources/public/js/out.js.map"
-                                        :preamble      ["react/react.min.js"]
+                                        :preamble      ["cljsjs/development/react.inc.js"]
                                         :optimizations :none
                                         :pretty-print  true}}
                        :advanced {:source-paths ["src/cljs" "yaks/gamma/src" "yaks/gamma-driver/src"]
                                   :compiler {:output-to     "resources/public/advanced/app.js"
                                              :output-dir    "resources/public/advanced/out"
                                              :source-map    "resources/public/advanced/out.js.map"
-                                             :preamble      ["react/react.min.js"]
+                                             :preamble      ["cljsjs/production/react.min.inc.js"]
                                              :optimizations :advanced
                                              :pseudo-names  false
                                              :elide-asserts true
@@ -73,7 +75,7 @@
                    :plugins [ ;;[lein-figwheel "0.2.1-SNAPSHOT"]
                              [lein-figwheel "0.3.3"]
                              [cider/cider-nrepl "0.9.0-SNAPSHOT"]
-                             [refactor-nrepl "1.0.5"]
+                             [refactor-nrepl "1.0.5"]]
 
                    :figwheel {:http-server-root "public"
                               :server-port      3449
@@ -88,7 +90,7 @@
                                                :compiler {:output-to     "resources/public/js/app_test.js"
                                                           :output-dir    "resources/public/js/test"
                                                           :source-map    "resources/public/js/test.js.map"
-                                                          :preamble      ["react/react.min.js"]
+                                                          :preamble      ["cljsjs/development/react.inc.js"]
                                                           :optimizations :whitespace
                                                           :pretty-print  false}}
                                         :prod {:id           "prod"
@@ -99,10 +101,9 @@
                                                               :output-dir    "resources/public/js/bin"
                                                               :optimizations :advanced
                                                               ;;:pretty-print  true
-                                                              :preamble      ["react/react.min.js"]
-                                                              :externs       ["react/externs/react.js"
-                                                                              "resources/externs/webvr.js"]
-                                                              }}}}}
+                                                              :preamble      ["cljsjs/production/react.min.inc.js"]
+                                                              :externs       ["cljsjs/common/react.ext.js"
+                                                                              "resources/externs/webvr.js"]}}}}}
 
              :uberjar {:source-paths ["env/prod/clj"]
                        :hooks [leiningen.cljsbuild]
