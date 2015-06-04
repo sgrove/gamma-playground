@@ -15,6 +15,13 @@
     (:require-macros [cljs.core.async.macros :as async :refer [go]])
     (:import [goog.net XhrIo]))
 
+
+(defn request-full-screen [canvas hmd]
+  (cond
+    (aget canvas "mozRequestFullScreen")    (.call (aget canvas "mozRequestFullScreen") canvas #js{:vrDisplay hmd})
+    (aget canvas "webkitRequestFullscreen") (.call (aget canvas "webkitRequestFullscreen") canvas #js{:vrDisplay hmd})
+    :else                                   :fail))
+
 (defn append-buffers [buffer-1 buffer-2]
   (let [cl  (+ (.-byteLength buffer-1)
                (.-byteLength buffer-2))
@@ -139,27 +146,7 @@
        (reduce merge {})
        (assoc root-node :children)))
 
-(defn fix-webgl-inspector-quirks [capture-first-frame? show? & [height]]
-  (let [inspector-capture-nodes (js/document.querySelectorAll "[title='Capture frame (F12)']")
-        inspector-ui-nodes      (js/document.querySelectorAll "[title='Show full inspector (F11)']")
-        inspector-windows       (js/document.querySelectorAll ".splitter-horizontal")
-        target-capture-node     (aget inspector-capture-nodes 1)
-        synthetic-click         (doto (js/document.createEvent "MouseEvent")
-                                  (.initMouseEvent "click", true, true, js/window, 0, 0, 0, 0, 0, false, false, false, false, 0))]
-    (when (= 3 (.-length inspector-capture-nodes))
-      (.remove (aget inspector-capture-nodes 0))
-      (.remove (aget inspector-ui-nodes 0))
-      (.remove (aget inspector-capture-nodes 2))
-      (.remove (aget inspector-ui-nodes 2))
-      (.remove (.-parentNode (aget inspector-windows 0)))
-      (.remove (.-parentNode (aget inspector-windows 2)))
-      (when capture-first-frame?
-        (.dispatchEvent target-capture-node synthetic-click))
-      (aset js/window "captureNextFrame"
-            (fn [] (.dispatchEvent target-capture-node synthetic-click)))
-      (let [inspector-window (.-parentNode (aget inspector-windows 1))
-            existing-height  (.-clientHeight inspector-window)]
-        (.setAttribute inspector-window "style" (str "height: " height "px;" (when-not show? "display: none;")))))))
+
 
 (def default-model
   "apartment_3.gltf")
@@ -193,7 +180,8 @@
                     :tick-first-frame?    false
                     :manual-tick?         false
                     :collapse-all?        false
-                    :capture-first-frame? false}
+                    :capture-first-frame? false
+                    :super-mesh?          false}
         initial    (reduce merge {} (map (partial uri-param parsed-uri) (clj->js ks)))
         ;; Use this if you need to do any fn-based changes, e.g. split on a uri param
         special {:skybox-name (when-let [skybox-name (second (uri-param parsed-uri "skybox-name" "sky1.png"))]
@@ -246,7 +234,7 @@
    189 "-"
    190 "."})
 
-(defn track-key-state [cast! direction suppressed-key-combos event]
+(defn track-key-state [cast! direction suppressed-key-combos app-state event]
   (let [meta?      (when (.-metaKey event) "meta")
         shift?     (when (.-shiftKey event) "shift")
         ctrl?      (when (.-ctrlKey event) "ctrl")
@@ -282,6 +270,11 @@
                                         js/String.fromCharCode
                                         .toLowerCase))]
         (let [key-name (keyword (str human-name "?"))]
+          (when (and (= key-name :t?)
+                     (= direction :down)
+                     app-state)
+            (request-full-screen (get-in @app-state [:webgl :canvas :node])
+                                 (get-in @app-state [:hmds :hmd])))
           (cast! :key-state-changed [{:key-name-kw key-name
                                       :code        (.-which event)
                                       :depressed?  (= direction :down)}]))))))
@@ -591,7 +584,7 @@
      u-point-lighting-color #js[0.8 0.8 0.8]
      u-point-lighting-diffuse-color  #js[0.8 0.8 0.8]
      u-point-lighting-specular-color #js[0.8 0.8 0.8]
-     u-material-shininess            1
+     u-material-shininess            42
      u-use-lighting       true
      u-light-angle        #js [;;-1 0 -1
                                -1.5092036732051048 -3.149999999999983, 1
@@ -755,13 +748,13 @@
         texture-program? (map? material)]
     (if texture-program?
       (do
-        :texture-specular-per-fragment
+        ;;:texture-specular-per-fragment
         :texture-per-fragment-light
         ;;:texture-flat
         )
       (do
         :diffuse-per-fragment-light
-        :diffuse-light
+        ;;:diffuse-light
         ;;:diffuse-flat
         ))))
 
@@ -783,7 +776,7 @@
                             n))
         render-node     (fn render-node [[node-name node] mv]
                           (let [mv mv ;;(geom/* mv (:matrix node))
-                                ]
+]
                             (doseq [mesh (:meshes node)]
                               (doseq [[index mesh] (map vector (range) (:primitives mesh))]
                                 (let [vertices         (assoc (get-in mesh [:attributes :p]) :id (primitive-id node-name mesh index :p))
@@ -822,7 +815,7 @@
                                                    (get-in state [:debug :collapse-all?])))
                                     ;;(js/console.log "draw-elements " (pr-str program-name))
                                     #_(js/console.log "\tscene-data:" (clj->js (assoc scene-data
-                                                                                      {:tag :element-index} indices)))
+                                                                                     {:tag :element-index} indices)))
                                     (gd/draw-elements driver (gd/bind driver program
                                                                       (assoc scene-data
                                                                              {:tag :element-index} indices))
@@ -846,16 +839,18 @@
         (.scissor  gl sx sy sw sh)
         (.clear gl (.-DEPTH_BUFFER_BIT gl))
         ;;(.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
-        ;;(js/console.log "eye: " (clj->js eye))
+        (js/console.log "eye: " (clj->js eye))
         (doseq [node (:nodes scene)]
           (let [scale (max (js/Math.abs (* rot 2)))]
             ;;(js/console.log "Rendering node: " (clj->js node))
             (render-node [(:name node) node] (-> mv
                                                  (geom/rotate-around-axis [1 0 0] (- (:pitch camera)))
                                                  (geom/rotate-around-axis [0 1 0] (- (:yaw camera)))
-                                                 (geom/translate [(- (:x camera) (get-in eye [:translation :x]))
+                                                 (geom/rotate-around-axis [0 0 1] (- (:roll camera)))
+                                                 (geom/translate [(- (- (:x camera)) (get-in eye [:translation :x]))
                                                                   (- (:y camera))
-                                                                  (- (:z camera) (get-in eye [:translation :z]))])
+                                                                  (- (- (:z camera)) (get-in eye [:translation :z])
+                                                                     )])
                                                  ;;(geom/translate [-3 0 5.5])
                                                  (geom/rotate-around-axis [1 0 0] (* js/Math.PI 1.5))
                                                  ;;(geom/rotate-around-axis [0 0 1] (if (:flip-y? camera) js/Math.PI 0))
@@ -888,12 +883,12 @@
   (let [time-now      (.getTime (js/Date.))
         elapsed       (- time-now (:last-rendered state))
         pos           (when-let [sensor (get-in state [:hmds :pos])]
-                        (.getState sensor))
+                        (.call (aget sensor "getState") sensor))
         ;; TODO: change these to abstract :forward/:backward lookups
         ;; if it's not too expensive
         ;; TODO: Make this configurable at runtime to tweak with the values
         last-hmd-pos  (get-in state [:scene :hmd-pos])
-        hmd-move-factor 10
+        hmd-move-factor 0
         hmd-x         (aget pos "position" "x")
         hmd-y         (aget pos "position" "y")
         hmd-z         (aget pos "position" "z")
@@ -919,8 +914,9 @@
                             slow-factor)
                          hmd-dy)
         camera        (-> (get-in state [:scene :camera])
-                          (assoc :yaw (aget pos "orientation" "y"))
-                          (assoc :pitch (aget pos "orientation" "x")))]
+                          (assoc :yaw   (* 1 js/Math.PI (aget pos "orientation" "y")))
+                          (assoc :pitch (* 1 js/Math.PI (aget pos "orientation" "x")))
+                          (assoc :roll  (* 1 js/Math.PI (aget pos "orientation" "z"))))]
     (if (zero? (:last-rendered state))
       (-> state
           (assoc :last-rendered time-now)
@@ -946,6 +942,9 @@
   [message [{:keys [key-name-kw depressed?]}] state]
   (when-let [capture (and (= key-name-kw :c?) (.-captureNextFrame js/window))]
     (.call capture))
+  (when (= key-name-kw :t?)
+    (request-full-screen (get-in state [:webgl :canvas :node])
+                         (get-in state [:hmds :hmd])))
   (assoc-in state [:keyboard key-name-kw] depressed?))
 
 (defmethod control-event :mouse-moved
@@ -994,8 +993,8 @@
         key-up-handler           (fn [])
         suppressed-key-combos    #{"meta+A" "meta+D" "meta+Z" "shift+meta+Z" "backspace"
                                    "shift+meta+D" "up" "down" "left" "right" "meta+G"}
-        handle-key-down          (partial track-key-state cast! :down suppressed-key-combos)
-        handle-key-up            (partial track-key-state cast! :up   suppressed-key-combos)
+        handle-key-down          (partial track-key-state cast! :down suppressed-key-combos app-state)
+        handle-key-up            (partial track-key-state cast! :up   suppressed-key-combos nil)
         handle-mouse-move!       #(handle-mouse-move cast! %)
         handle-canvas-mouse-down #(handle-mouse-down cast! %)
         handle-canvas-mouse-up   #(handle-mouse-up   cast! %)
@@ -1191,7 +1190,7 @@
 
 (defn get-hmds [cb]
   (let [dev-ch      (chan)
-        dev-promise (js/navigator.getVRDevices)
+        dev-promise (.call (aget js/navigator "getVRDevices") js/navigator)
         fov->clj    (fn [fov]
                       {:up    (aget fov "upDegrees")
                        :down  (aget fov "downDegrees")
@@ -1214,19 +1213,19 @@
     (.then dev-promise
            (fn [result]
              (let [devices    (js->clj result)
-                   hmd        (some #(and (= (type %) js/HMDVRDevice)
+                   hmd        (some #(and (= (type %) (aget js/window "HMDVRDevice"))
                                           %) devices)
                    pos-sensor (when hmd
-                                (some #(and (= (type %) js/PositionSensorVRDevice)
-                                            (= (.-hardwareUnitId %)
-                                               (.-hardwareUnitId hmd))
+                                (some #(and (= (type %) (aget js/window "PositionSensorVRDevice"))
+                                            (= (aget % "hardwareUnitId")
+                                               (aget % "hardwareUnitId"))
                                             %) devices))
                    devices    {:hmd hmd
                                :pos pos-sensor}]
                ;; Initialize the sensors, gather basic unchanging data
                ;; (fov, eye translations, etc.)
-               (.resetSensor pos-sensor)
-               (let [left-eye  (.getEyeParameters hmd "left")
+               (.call (aget pos-sensor "resetSensor") pos-sensor)
+               (let [left-eye  (clj->js (.call (aget hmd "getEyeParameters") hmd "left"))
                      left-eye  (-> {}
                                    (assoc :fov (fov->clj (aget left-eye "currentFieldOfView")))
                                    (assoc :max-fov (fov->clj (aget left-eye "maximumFieldOfView")))
@@ -1234,7 +1233,7 @@
                                    (assoc :rec-fov (fov->clj (aget left-eye "recommendedFieldOfView")))
                                    (assoc :translation (dom-point->clj (aget left-eye "eyeTranslation")))
                                    (assoc :render-rect (dom-rect->clj (aget left-eye "renderRect"))))
-                     right-eye (js->clj (.getEyeParameters hmd "right"))
+                     right-eye (js->clj (.call (aget hmd "getEyeParameters") hmd "right"))
                      right-eye (-> {}
                                    (assoc :fov (fov->clj (aget right-eye "currentFieldOfView")))
                                    (assoc :max-fov (fov->clj (aget right-eye "maximumFieldOfView")))
@@ -1328,7 +1327,12 @@
                                           (let [combined-primitives (->> nodes
                                                                          (map (fn [node] [(:name node) node]))
                                                                          (map (partial walk-tree-combining-meshes
-                                                                                 #(get-in % [:material :values :diffuse]) 65532 0 []))
+                                                                                 (if (:super-mesh? initial-query-map)
+                                                                                   (constantly true)
+                                                                                   #(get-in % [:material :values :diffuse]))
+                                                                                 65532 0 []
+                                                                                 ;;
+                                                                                 ))
                                                                          (mapcat vals)
                                                                          flatten
                                                                          (sort-by primitive->program-name))
@@ -1349,7 +1353,8 @@
                                                                                                                                    :draw-mode 4}
                                                                                                                                   tagged-primitive
                                                                                                                                   ;; Remove once we support materials
-                                                                                                                                  ;;{:material  {:values {:diffuse [0.800000011920929 0.09411760419607162 0.16862799227237701 1]}, :name "material_1"}}
+                                                                                                                                  (when (:super-mesh? initial-query-map)
+                                                                                                                                    {:material  {:values {:diffuse [0.800000011920929 0.09411760419607162 0.16862799227237701 1]}, :name "material_1"}})
                                                                                                                                   )]}]}]
                                                                               (js/console.log "\tnew: " (clj->js new-primitive))
                                                                               new-primitive))
@@ -1370,7 +1375,7 @@
                                                      :controls controls
                                                      :keyboard keyboard}}))]
         (<! (async/timeout 500))
-        (fix-webgl-inspector-quirks true true 250)
+        o(utils/fix-webgl-inspector-quirks true true 250)
         (aset js/window "processedGLTF" (clj->js scene))
         (aset js/window "scene" scene)
         
