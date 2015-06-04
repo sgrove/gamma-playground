@@ -337,3 +337,83 @@
                                                  :wrap   wrap}]
                                       (cb final))))) img))
         (set! (.-src img) src)))))
+
+(defn fix-webgl-inspector-quirks [capture-first-frame? show? & [height]]
+  (let [inspector-capture-nodes (js/document.querySelectorAll "[title='Capture frame (F12)']")
+        inspector-ui-nodes      (js/document.querySelectorAll "[title='Show full inspector (F11)']")
+        inspector-windows       (js/document.querySelectorAll ".splitter-horizontal")
+        target-capture-node     (aget inspector-capture-nodes 1)
+        synthetic-click         (doto (js/document.createEvent "MouseEvent")
+                                  (.initMouseEvent "click", true, true, js/window, 0, 0, 0, 0, 0, false, false, false, false, 0))]
+    (when (= 3 (.-length inspector-capture-nodes))
+      (.remove (aget inspector-capture-nodes 0))
+      (.remove (aget inspector-ui-nodes 0))
+      (.remove (aget inspector-capture-nodes 2))
+      (.remove (aget inspector-ui-nodes 2))
+      (.remove (.-parentNode (aget inspector-windows 0)))
+      (.remove (.-parentNode (aget inspector-windows 2)))
+      (when capture-first-frame?
+        (.dispatchEvent target-capture-node synthetic-click))
+      (aset js/window "captureNextFrame"
+            (fn [] (.dispatchEvent target-capture-node synthetic-click)))
+      (let [inspector-window (.-parentNode (aget inspector-windows 1))
+            existing-height  (.-clientHeight inspector-window)]
+        (.setAttribute inspector-window "style" (str "height: " height "px;" (when-not show? "display: none;")))))))
+
+(defn uri-param [parsed-uri param-name & [not-found]]
+  (let [v (.getParameterValue parsed-uri param-name)]
+    (cond
+      (= v "")                          [(keyword param-name) not-found]
+      (undefined? v)                    [(keyword param-name) not-found]
+      (= v "true")                      [(keyword (str param-name "?")) true]
+      (= v "false")                     [(keyword (str param-name "?")) false]
+      (= (.toString (js/parseInt v)) v) [(keyword param-name) (js/parseInt v)]
+      (re-matches #"^\d+\.\d*" v)       [(keyword param-name) (js/parseFloat v)]
+      :else                             [(keyword param-name) v])))
+
+(defn process-immutable-json-model [id model-json key-mapping]
+  (let [process-key (fn [[json-key edn-key]]
+                      {edn-key {:id         (keyword (str (name id) "-" (name edn-key)))
+                                :immutable? true
+                                :data       (js->clj (aget model-json json-key))}})
+        model       (reduce merge {} (map process-key key-mapping))
+        indices-count (when-let [data (get-in model [:indices :data])]
+                        (if-let [length (.-length data)]
+                          length
+                          (count data)))]
+    (if indices-count
+      (assoc-in model [:indices :count] indices-count)
+      model)))
+
+(defn make-video-element [element-id src video-can-play video-ended]
+  (let [element (js/document.createElement "video")]
+    (doto element
+                  (.addEventListener "canplaythrough" (partial video-can-play element) true)
+                  (.addEventListener "ended" (partial video-ended element) true)
+                  (.setAttribute "id" element-id)
+                  (.setAttribute "controls" "true")
+                  (.setAttribute "preload" "auto")
+                  (.setAttribute "style" "display:none;")
+                  (.setAttribute "src" src))
+    element))
+
+(defn reset-gl-canvas! [canvas-node]
+  (let [gl     (.getContext canvas-node "webgl")
+        width  (.-clientWidth canvas-node)
+        height (.-clientHeight canvas-node)]
+    ;; Set the width/height (in terms of GL-resolution) to actual
+    ;; canvas-element width/height (or else you'll see blurry results)
+    (set! (.-width canvas-node) width)
+    (set! (.-height canvas-node) height)
+    ;; Setup GL Canvas
+    (.viewport gl 0 0 width height)))
+
+(defn get-perspective-matrix
+  "Be sure to 
+   1. pass the WIDTH and HEIGHT of the canvas *node*, not
+      the GL context
+   2. (set! (.-width/height canvas-node)
+      width/height), respectively, or you may see no results, or strange
+      results"
+  [width height]
+  (mat/perspective 45 (/ width height) 0.1 100))
