@@ -1,52 +1,35 @@
 (ns gampg.learn-gamma.lesson-02
-  (:require [gamma.api :as g]
+  (:require [cljs.repl :as repl]
+            [fipp.edn :as fipp]
+            [gamma.api :as g]
             [gamma.program :as p]
             [gamma-driver.api :as gd]
             [gamma-driver.drivers.basic :as driver]
+            [gampg.learn-gamma.programs :as progs]
+            [gampg.utils :as utils]
             [thi.ng.geom.core :as geom]
             [thi.ng.geom.core.matrix :as mat :refer [M44]]))
 
 (def title
   "2. Adding colour")
 
-(def u-p-matrix
-  (g/uniform "uPMatrix" :mat4))
-
-(def u-mv-matrix
-  (g/uniform "uMVMatrix" :mat4))
-
-(def a-position
-  (g/attribute "aVertexPosition" :vec3))
-
-(def a-color
-  (g/attribute "aVertexColor" :vec4))
-
 (def v-color
   (g/varying "vColor" :vec4 :mediump))
 
 (def program-source
   (p/program
-   {:vertex-shader   {(g/gl-position) (-> u-p-matrix
-                                          (g/* u-mv-matrix)
-                                          (g/* (g/vec4 a-position 1)))
-                      v-color         a-color}
-    :fragment-shader {(g/gl-frag-color) v-color}}))
-
-(defn get-perspective-matrix
-  "Be sure to 
-   1. pass the WIDTH and HEIGHT of the canvas *node*, not
-      the GL context
-   2. (set! (.-width/height canvas-node)
-      width/height), respectively, or you may see no results, or strange
-      results"
-  [width height]
-  (mat/perspective 45 (/ width height) 0.1 100))
+   {:id              :lesson-02-simple
+    :vertex-shader   {(g/gl-position) (-> progs/u-p-matrix
+                                          (g/* progs/u-mv-matrix)
+                                          (g/* (g/vec4 progs/a-position 1)))
+                      v-color         progs/a-color}
+    :fragment-shader {(g/gl-frag-color) progs/v-color}}))
 
 (defn get-data [p mv vertices vertex-colors]
-  {u-p-matrix  p
-   u-mv-matrix mv
-   a-position  vertices
-   a-color     vertex-colors})
+  {progs/u-p-matrix  p
+   progs/u-mv-matrix mv
+   progs/a-position  vertices
+   progs/a-color     vertex-colors})
 
 (defn make-driver [gl]
   (driver/basic-driver gl))
@@ -62,31 +45,55 @@
     ;; Setup GL Canvas
     (.viewport gl 0 0 width height)))
 
-(defn main [gl node]
-  (let [w                 (.-clientWidth node)
-        h                 (.-clientHeight node)
-        driver            (make-driver gl)
-        program           program-source
-        p                 (get-perspective-matrix w h)
-        mv                (mat/matrix44)
-        triangle-vertices [[ 0  1  0]
+(def triangle
+  {:vertices {:data       [[ 0  1  0]
                            [-1 -1  0]
                            [ 1 -1  0]]
-        triangle-colors   [[1 0 0 1]
+              :immutable? true
+              :id         :triangle-vertices}
+   :colors   {:data       [[1 0 0 1]
                            [0 1 0 1]
                            [0 0 1 1]]
-        square-vertices   [[ 1  1  0]
+              :immutable? true
+              :id         :triangle-colors}})
+
+(def square
+  {:vertices {:data       [[ 1  1  0]
                            [-1  1  0]
                            [ 1 -1  0]
                            [-1 -1  0]]
-        square-colors     [[1 0 0 1]
+              :immutable? true
+              :id         :square-vertices}
+   :colors   {:data       [[1 0 0 1]
                            [0 1 0 1]
                            [0 0 1 1]
-                           [1 1 1 1]]]
+                           [1 1 1 1]]
+              :immutable? true
+              :id         :square-colors}})
+
+(defn main [app-state node]
+  (let [gl      (.getContext node "webgl")
+        w       (.-clientWidth node)
+        h       (.-clientHeight node)
+        driver  (make-driver gl)
+        program program-source
+        p       (utils/get-perspective-matrix w h)
+        mv      (mat/matrix44)]
     (reset-gl-canvas! node)
     (.clearColor gl 0 0 0 1)
     (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
     (let [mv (geom/translate mv [-1.5 0 -7])]
-      (gd/draw-arrays driver (gd/bind driver program (get-data p mv triangle-vertices triangle-colors)) {:draw-mode :triangles}))
+      (gd/draw-arrays driver (gd/bind driver program (get-data p mv (:vertices triangle) (:colors triangle))) {:draw-mode :triangles}))
     (let [mv (geom/translate mv [3 0 -7])]
-      (gd/draw-arrays driver (gd/bind driver program (get-data p mv square-vertices square-colors)) {:draw-mode :triangle-strip}))))
+      (gd/draw-arrays driver (gd/bind driver program (get-data p mv (:vertices square) (:colors square))) {:draw-mode :triangle-strip}))))
+
+(def explanation
+  (str
+   "```clojure " (with-out-str (repl/source main)) "
+ ```
+"))
+
+(def summary
+  {:title       title
+   :enter       main
+   :explanation explanation})

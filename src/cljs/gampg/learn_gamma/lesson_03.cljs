@@ -3,104 +3,46 @@
               [gamma.program :as p]
               [gamma-driver.api :as gd]
               [gamma-driver.drivers.basic :as driver]
+              [gampg.utils :as utils]
+              [gampg.learn-gamma.lesson-02 :as lesson-02]
+              [gampg.learn-gamma.programs :as progs]
               [thi.ng.geom.core :as geom]
               [thi.ng.geom.core.matrix :as mat :refer [M44]]))
 
 (def title
   "3. A bit of movement")
 
-(def u-p-matrix
-  (g/uniform "uPMatrix" :mat4))
-
-(def u-mv-matrix
-  (g/uniform "uMVMatrix" :mat4))
-
-(def a-position
-  (g/attribute "aVertexPosition" :vec3))
-
-(def a-color
-  (g/attribute "aVertexColor" :vec4))
-
-(def v-color
-  (g/varying "vColor" :vec4 :mediump))
-
-(def program-source
-  (p/program
-   {:vertex-shader   {(g/gl-position) (-> u-p-matrix
-                                          (g/* u-mv-matrix)
-                                          (g/* (g/vec4 a-position 1)))
-                      v-color         a-color}
-    :fragment-shader {(g/gl-frag-color) v-color}}))
-
-(defn get-perspective-matrix
-  "Be sure to 
-   1. pass the WIDTH and HEIGHT of the canvas *node*, not
-      the GL context
-   2. (set! (.-width/height canvas-node)
-      width/height), respectively, or you may see no results, or strange
-      results"
-  [width height]
-  (mat/perspective 45 (/ width height) 0.1 100))
-
 (defn get-data [p mv vertices vertex-colors]
-  {u-p-matrix  p
-   u-mv-matrix mv
-   a-position  vertices
-   a-color     vertex-colors})
+  {progs/u-p-matrix  p
+   progs/u-mv-matrix mv
+   progs/a-position  vertices
+   progs/a-color     vertex-colors})
 
-(defn make-driver [gl]
-  (driver/basic-driver gl))
-
-(defn reset-gl-canvas! [canvas-node]
-  (let [gl     (.getContext canvas-node "webgl")
-        width  (.-clientWidth canvas-node)
-        height (.-clientHeight canvas-node)]
-    ;; Set the width/height (in terms of GL-resolution) to actual
-    ;; canvas-element width/height (or else you'll see blurry results)
-    (set! (.-width canvas-node) width)
-    (set! (.-height canvas-node) height)
-    ;; Setup GL Canvas
-    (.viewport gl 0 0 width height)))
-
-;; js/window.requestAnimationFrame doesn't take arguments, so we have
-;; to store the state elsewhere - in this atom, for example.
 (defn app-state [width height]
   {:last-rendered 0
    :scene         {:triangle-rotation 0
                    :square-rotation   0
-                   :triangle-vertices [[ 0  1  0]
-                                       [-1 -1  0]
-                                       [ 1 -1  0]]
-                   :triangle-colors   [[1 0 0 1]
-                                       [0 1 0 1]
-                                       [0 0 1 1]]
-                   :square-vertices   [[ 1  1  0]
-                                       [-1  1  0]
-                                       [ 1 -1  0]
-                                       [-1 -1  0]]
-                   :square-colors     [[1 0 0 1]
-                                       [0 1 0 1]
-                                       [0 0 1 1]
-                                       [1 1 1 1]]
+                   :triangle          lesson-02/triangle
+                   :square            lesson-02/square
                    :mv                (mat/matrix44)
-                   :p                 (get-perspective-matrix width height)}})
+                   :p                 (utils/get-perspective-matrix width height)}})
 
-(defn draw-fn [gl driver program]
+(defn draw-scene [gl driver program]
   (fn [state]
     (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
     (let [{:keys [p mv
-                  triangle-vertices triangle-colors
+                  triangle
                   triangle-rotation
-                  square-vertices square-colors
+                  square
                   square-rotation]} (:scene state)]
       (let [mv (-> mv
                    (geom/translate [-1.5 0 -7])
                    (geom/rotate-y triangle-rotation))]
-        (gd/draw-arrays driver (gd/bind driver program (get-data p mv triangle-vertices triangle-colors)) {:draw-mode :triangles}))
+        (gd/draw-arrays driver (gd/bind driver program (get-data p mv (:vertices triangle) (:colors triangle))) {:draw-mode :triangles}))
       (let [mv (-> mv
                    (geom/translate [3 0 -7])
                    (geom/rotate-x square-rotation))]
-        (gd/draw-arrays driver (gd/bind driver program (get-data p mv square-vertices square-colors)) {:draw-mode :triangle-strip})))))
+        (gd/draw-arrays driver (gd/bind driver program (get-data p mv (:vertices square) (:colors square))) {:draw-mode :triangle-strip})))))
 
 (defn animate [draw-fn step-fn current-value]
   (js/requestAnimationFrame
@@ -124,13 +66,18 @@
         (update-in [:scene :square-rotation] + square-diff)
         (assoc-in [:last-rendered] time-now))))
 
-(defn main [gl node]
-  (let [width   (.-clientWidth node)
+(defn main [global-app-state node]
+  (let [gl      (.getContext node "webgl")
+        width   (.-clientWidth node)
         height  (.-clientHeight node)
-        driver  (make-driver gl)
-        program program-source
+        driver  (driver/basic-driver gl)
+        program (gd/program driver progs/simple-color)
         state   (app-state width height)]
-    (reset-gl-canvas! node)
+    (utils/reset-gl-canvas! node)
     (.clearColor gl 0 0 0 1)
     (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
-    (animate (draw-fn gl driver program) tick state)))
+    (animate (draw-scene gl driver program) tick state)))
+
+(def summary
+  {:title title
+   :enter main})
