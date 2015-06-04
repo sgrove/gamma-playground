@@ -65,7 +65,6 @@
                                                                                         (when-let [exit (get-in lessons [(:index old-lesson) :exit])]
                                                                                           (exit app  (get-in app [:live :gl])))
                                                                                         (let [new-lesson (get-in lessons [idx])]
-                                                                                          (js/console.log idx " -> " (pr-str (:live app)))
                                                                                           ((:enter new-lesson) app (get-in app [:live :node]))
                                                                                           (merge new-lesson
                                                                                                  {:index idx}))))
@@ -77,7 +76,7 @@
                                       (let [debug-data  (reduce merge {} (map (juxt identity #(get-in app %)) (:debug-keys summary)))]
                                         (when (seq debug-data)
                                           (dom/code nil (with-out-str (fipp/pprint debug-data)))))
-                                      (dom/div #js{:dangerouslySetInnerHTML #js{:__html (md/mdToHtml (:explanation summary "No explanation for this lesson"))}}))))))))
+                                      (dom/div #js{:dangerouslySetInnerHTML #js{:__html (md/md->html (:explanation summary "No explanation for this lesson"))}}))))))))
    app-state
    {:target (. js/document (getElementById "app"))}))
 
