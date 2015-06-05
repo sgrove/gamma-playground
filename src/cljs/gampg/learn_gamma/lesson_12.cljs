@@ -362,7 +362,7 @@
                             :count      (count indices)
                             :immutable? true})))
 
-(defn main [node]
+(defn main [_ node]
   (let [gl      (.getContext node "webgl")
         width   (.-clientWidth node)
         height  (.-clientHeight node)
@@ -387,3 +387,11 @@
                                  :immutable? true}]
                     (animate (draw-fn gl driver program) tick (assoc-in state [:scene :texture] texture)))))
       (aset image "src" "/images/moon.gif"))))
+
+(def explanation
+  nil)
+
+(def summary
+  {:title       title
+   :enter       main
+   :explanation explanation})

@@ -245,9 +245,10 @@
       (gd/bind driver (get programs :specular) screen-data)
       (gd/draw-arrays driver (get programs :specular) {:draw-mode :triangle-strip
                                                        :count     4})
-      (gd/draw-elements driver (gd/bind driver (get programs :specular) scene-data) {:draw-mode :triangles
-                                                                                     :first     0
-                                                                                     :count     (get-in model [:indices :count])}))))
+      (gd/draw-elements driver (gd/bind driver (get programs :specular) scene-data)
+                        {:draw-mode :triangles
+                         :first     0
+                         :count     (get-in model [:indices :count])}))))
 
 (defn animate [draw-fn step-fn state]
   (js/requestAnimationFrame
@@ -299,9 +300,7 @@
         programs    {:specular (gd/program driver program-specular)
                      :simple   (gd/program driver lesson-02/program-source)}
         ;; WxH must be a power of two (e.g. 64, 128, 256, 512, 1024, etc.)
-        local-state (-> (app-state width height)
-                        (assoc-in [:scene :square :vertices] lesson-02/square-vertices)
-                        (assoc-in [:scene :square :colors] lesson-02/square-colors))
+        local-state (-> (app-state width height))
         _           (swap! global-app-state merge local-state)
         state       global-app-state]
     (reset-gl-canvas! node)
@@ -361,3 +360,11 @@
           (set! (.-tick js/window) next-tick)
           (do (<! (async/timeout 100))
               (next-tick)))))))
+
+(def explanation
+  nil)
+
+(def summary
+  {:title       title
+   :enter       main
+   :explanation explanation})

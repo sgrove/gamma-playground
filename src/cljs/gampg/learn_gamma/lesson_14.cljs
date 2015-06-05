@@ -226,7 +226,7 @@
       (assoc-in model [:indices :count] indices-count)
       model)))
 
-(defn main [node]  
+(defn main [_ node]
   (let [gl       (.getContext node "webgl")
         width    (.-clientWidth node)
         height   (.-clientHeight node)
@@ -261,3 +261,11 @@
         (if manual-step-frame-by-frame?
           (set! (.-tick js/window) next-tick)
           (next-tick))))))
+
+(def explanation
+  nil)
+
+(def summary
+  {:title       title
+   :enter       main
+   :explanation explanation})

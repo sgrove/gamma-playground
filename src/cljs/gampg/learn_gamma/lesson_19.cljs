@@ -1,35 +1,28 @@
-(ns ^:figwheel-load gampg.learn-gamma.lesson-19
+(ns ^:figwheel-always gampg.learn-gamma.lesson-19
     (:require [cljs.core.async :as async :refer [<! put! chan]]
-              [clojure.string :as string]
               [gamma.api :as g]
               [gamma.program :as p]
               [gamma-driver.api :as gd]
               [gamma-driver.drivers.basic :as driver]
+              [gampg.learn-gamma.lesson-01 :as lesson-01]
+              [gampg.learn-gamma.lesson-02 :as lesson-02]
+              [gampg.learn-gamma.programs :as progs]
+              [gampg.learn-gamma.programs.skybox :as skybox]
               [gampg.utils :as utils]
-              [goog.Uri]
               [goog.webgl :as ggl]
               [thi.ng.geom.core :as geom]
               [thi.ng.geom.core.matrix :as mat :refer [M44]]
-              [thi.ng.geom.core.vector :as vec])
-    (:require-macros [cljs.core.async.macros :as async :refer [go]])
-    (:import [goog.net XhrIo]))
+              [thi.ng.geom.core.vector :as v :refer [vec2 vec3]]
+              [thi.ng.geom.core.utils :as gu]
+              [thi.ng.geom.aabb :as a]
+              [thi.ng.geom.plane :as pl]
+              [thi.ng.geom.quad :as q]
+              [thi.ng.geom.webgl.core :as gl]
+              [thi.ng.geom.webgl.buffers :as buf])
+    (:require-macros [cljs.core.async.macros :as async :refer [go]]))
 
 (def title
-  "19. Skyboxes")
-
-;; Generate your own skybox here (as of June 3, 2015)
-;; http://www.nutty.ca/webgl/skygen/
-
-(def initial-query-map
-  (let [parsed-uri (goog.Uri. (.. js/window -location -href))
-        ks         (.. parsed-uri getQueryData getKeys)
-        defaults   {:tick-first-frame?    false
-                    :manual-tick?         false
-                    :capture-first-frame? false}
-        initial    (reduce merge {} (map (partial utils/uri-param parsed-uri) (clj->js ks)))
-        special {:skybox-name (when-let [skybox-name (second (utils/uri-param parsed-uri "skybox-name" "sky1.png"))]
-                                (vec (string/split skybox-name ".")))}]
-    (merge defaults initial special)))
+  "19. Shadow maps")
 
 (def half-pi
   (/ js/Math.PI 2))
@@ -49,169 +42,257 @@
 (defn disable-mouse-wheel [event]
   (.stopPropagation event))
 
-(def u-sky-box-p-matrix
-  (g/uniform "uSkyBoxPositionMatrix" :mat4))
+;; TODO: Move this into core, and then pass in initial-query-map as
+;; part of the app-state.
+(def initial-query-map
+  (let [parsed-uri (goog.Uri. (.. js/window -location -href))
+        ks         (.. parsed-uri getQueryData getKeys)
+        defaults   {:tick-first-frame?    false
+                    :manual-tick?         false
+                    :capture-first-frame? false}
+        initial    (reduce merge {} (map (partial utils/uri-param parsed-uri) (clj->js ks)))]
+    (merge defaults initial)))
 
-(def u-sky-box-mv-matrix
-  (g/uniform "uSkyBoxMVMatrix" :mat4))
-
-(def u-sky-box-inverse-mv-matrix
-  (g/uniform "uSkyBoxInverseMVMatrix" :mat4))
-
-(def a-sky-box-position
-  (g/attribute "position" :vec3))
-
-(def a-sky-box-texture-coord
-  (g/attribute "aSkyBoxTextureCoord" :vec3))
-
-(def v-sky-box-texture-coord
-  (g/varying "vSkyBoxTextureCoord" :vec3 :highp))
-
-(def u-sky-box-sampler
-  (g/uniform "skybox" :samplerCube))
-
-(def u-m4-matrix
-  (g/uniform "um4_matrix" :mat4))
-
-(def v-sky-box-position
-  (g/varying "v_position" :vec4 :mediump))
-
-(def program-sky-box
-  (p/program
-   {:id              :lesson-19-sky-box
-    :vertex-shader   {(g/gl-position)         (g/* u-sky-box-p-matrix (g/* u-sky-box-mv-matrix (g/vec4 a-sky-box-position 1)))
-                      v-sky-box-texture-coord a-sky-box-texture-coord}
-    :fragment-shader {(g/gl-frag-color) (g/textureCube u-sky-box-sampler v-sky-box-texture-coord)}
-    :precision       {:float :mediump}}))
-
-(defn get-perspective-matrix
-  "Be sure to 
-   1. pass the WIDTH and HEIGHT of the canvas *node*, not
-      the GL context
-   2. (set! (.-width/height canvas-node)
-      width/height), respectively, or you may see no results, or strange
-      results"
-  [fov width height]
-  (mat/perspective fov (/ width height) 0.01 100))
-
-(defn get-normal-matrix [mv]
-  (-> mv
-      (geom/invert)
-      (geom/transpose)
-      (mat/matrix44->matrix33)
-      (object-array)))
-
-(defn my-input-fn [driver program binder-fn variable old-spec new-spec]
-  (let [t (:tag new-spec)]
-    (if (and false old-spec new-spec (not= :uniform t) (not= t :variable) (not= :texture t) (= (old-spec t) (new-spec t)))
-      old-spec
-      (if (and (= :uniform t) (:immutable? old-spec)
-               (not= :texture (:type variable))
-               (not= :samplerCube (:type variable)))
-        old-spec
-        (binder-fn (gd/gl driver) program variable new-spec)))))
-
-(defn make-driver [gl]
-  (driver/map->BasicDriver
-   {:gl             gl
-    :resource-state (atom {})
-    :mapping-fn     (fn [x] (or (:id x) (:element x) x))
-    :input-state    (atom {})
-    :input-fn       my-input-fn
-    :produce-fn     driver/default-produce-fn}))
-
-;; This is not serialization-friendly. Clean up before sharing this
-;; too widely.
-(defn app-state [width height gl node now]
+(defn app-state [width height]
   {:last-rendered 0
-   :mouse         {:pos         [0 0]
-                   :sensitivity 0.01}
-   :scene         {:rotation 0
-                   :mv       (mat/matrix44)
-                   :p        (get-perspective-matrix 45 width height)
-                   :sky-box  {}
-                   :camera   {:pitch -0.039203673205104164, :yaw -5.3000000000000105, :x 3.7236995248610296, :y 1, :z -1.7775460356400952}}
-   :webgl         {:canvas {:node node
-                            :gl   gl}}})
+   :scene         {:mv              (mat/matrix44)
+                   :p               (utils/get-perspective-matrix 45 width height)
+                   :square-vertices {:data       [[ 1  1  0]
+                                                  [-1  1  0]
+                                                  [ 1 -1  0]
+                                                  [-1 -1  0]]
+                                     :immutable? true
+                                     :id         :square-vertices}
+                   :square-colors   {:data       [[1 0 0 1]
+                                                  [0 1 0 1]
+                                                  [0 0 1 1]
+                                                  [1 1 1 1]]
+                                     :immutable? true
+                                     :id         :square-colors}}
+   :canvas {:width  width
+            :height height}})
 
-(def sky-box-vertices
-  {:data       [-1  1  1 
-                1  1  1 
-                1 -1  1 
-                -1 -1  1 
-                -1  1 -1 
-                1  1 -1 
-                1 -1 -1 
-                -1 -1 -1]
-   :id         :sky-box-vertices
-   :immutable? true})
+(def laptop-screen
+  {:vertices       {:data       [ 0.580687 0.659 0.813106
+                                 -0.580687 0.659 0.813107
+                                  0.580687 0.472 0.113121
+                                 -0.580687 0.472 0.113121]
+                    :immutable? true
+                    :id         :laptop-screen-vertices}
+   :normals        {:data       [0.000000 -0.965926 0.258819
+                                 0.000000 -0.965926 0.258819
+                                 0.000000 -0.965926 0.258819
+                                 0.000000 -0.965926 0.258819]
+                    :immutable? true
+                    :id         :laptop-screen-normals}
+   :texture-coords {:data       [1.0 1.0
+                                 0.0 1.0
+                                 1.0 0.0
+                                 0.0 0.0]
+                    :immutable? true
+                    :id         :laptop-screen-texture-coords}})
 
-(def sky-box-indices
-  {:data       [3,2,0,0,2,1,2,6,1,1,6,5,0,1,4,4,1,5,5,6,4,6,7,4,4,7,0,7,3,0,6,2,7,2,3,7]
-   :id         :sky-box-indices
-   :immutable? true})
+(defn get-data [p mv vertices normals color-texture texture-coords point-lighting-location diffuse-color emissive-color ambient-color]
+  (let [now (/ (.getTime (js/Date.)) 1000)]
+    {progs/u-p-matrix                      p
+     progs/u-mv-matrix                     mv
+     progs/u-n-matrix                      (utils/get-normal-matrix mv)
+     progs/u-ambient-lighting-color        [0.8 0.8 0.8]
+     progs/u-point-lighting-location       point-lighting-location
+     progs/u-point-lighting-diffuse-color  [0.8 0.8 0.8]
+     progs/u-point-lighting-specular-color [0.8 0.8 0.8]
+     progs/u-material-ambient-color        ambient-color
+     progs/u-material-diffuse-color        diffuse-color
+     progs/u-material-emissive-color       emissive-color
+     progs/u-material-shininess            32
+     progs/u-sampler                       color-texture
+     progs/a-position                      vertices
+     progs/a-texture-coord                 texture-coords
+     progs/a-vertex-normal                 normals}))
 
-(def mat44
-  (mat/matrix44))
+(defn draw-scene [driver state now spot-location spot-direction  spot-inner-angle spot-outer-angle spot-radius spot-color mv target]
+  (let [programs            (get-in state [:programs])
+        {:keys [p
+                color-texture specular-texture
+                cube-1
+                model
+                rotation]}  (:scene state)
+        
+        rotation            (- (utils/deg->rad now))
+        square-mv           (-> mv
+                                ;;(geom/translate [(* rotation 4) -0.5 -5])
+                                (geom/translate [(* (js/Math.sin (/ now 8)) 4) (* (js/Math.cos (/ now 3)) 2) -5])
+                                (geom/* (-> (mat/matrix44)
+                                            (geom/rotate-around-axis [0 1 0] rotation)
+                                            (geom/rotate-around-axis [1 0 0] (- (/ js/Math.PI 3)))))
+                                object-array)
+        model-mv            (do (-> mv
+                                    (geom/translate [0 -0.5 -7 ;;(- -1.0 (js/Math.abs (* 5 (js/Math.sin (/ now 20)))))
+                                                     ])
+                                    (geom/* (-> M44
+                                                (geom/rotate-around-axis [1 0 0] (- (/ js/Math.PI 2)))))
+                                    )
+                                (-> (mat/look-at (vec3 0 -0.5 -7)
+                                                 (vec3 (/ (get-in state [:mouse :pos 0]) 1000)
+                                                       (/ (get-in state [:mouse :pos 2]) 1000)
+                                                       1)
+                                                 (vec3 0 0 1))
+                                    (geom/rotate-around-axis [1 0 0] (- (/ js/Math.PI 2)))))
+        cube-1-mv           (-> mv
+                                (geom/translate [0 0 -10]))
+        scene-data          (-> (get-data p model-mv (:vertices model) (:normals model) color-texture (:texture-coords model) (object-array spot-location) #js[0.2 0.2 0.2]  #js[0.2 0.2 0.2]  #js[0.2 0.2 0.2])
+                                (select-keys (get-in programs [:specular :inputs]))
+                                (assoc {:tag :element-index} (:indices model)))
+        screen-data         (-> (get-data p model-mv (:vertices laptop-screen) (:normals laptop-screen) (get-in state [:framebuffer :depth])
+                                          (:texture-coords laptop-screen) nil #js[0.2 0.2 0.2]  #js[0.2 0.2 0.2]  #js[0.2 0.2 0.2])
+                                (select-keys (get-in programs [:specular :inputs]))
+                                (assoc {:tag :element-index} (:indices model)))
+        cube-1-data         (-> (get-data p cube-1-mv (:vertices cube-1) (:normals cube-1) color-texture (:texture-coords cube-1) (object-array spot-location) #js[0.2 0.2 0.2]  #js[0.2 0.2 0.2]  #js[0.2 0.2 0.2])
+                                (select-keys (get-in programs [:specular :inputs]))
+                                (assoc {:tag :element-index} (:indices cube-1)))
+        screen-texture-data {progs/u-p-matrix  p
+                             progs/u-mv-matrix square-mv
+                             progs/a-position  (get-in state [:scene :square-vertices])
+                             progs/a-color     (get-in state [:scene :square-colors])}]
+    (when target
+      (let [black  (:uniform-color programs)
+            inputs (:inputs black)]
+        (gd/draw-elements driver (gd/bind driver black (assoc (select-keys cube-1-data inputs)
+                                                              progs/u-color #js[0 0 0 1]
+                                                              {:tag :element-index} (get scene-data {:tag :element-index})))
+                          {:draw-mode :triangle-strip
+                           :first     0
+                           :count     18 ;;(get-in cube-1 [:indices :count])
+                           }
+                          target)
+        (gd/draw-elements driver (gd/bind driver black (assoc (select-keys scene-data inputs)
+                                                              progs/u-color #js[0 0 0 1]
+                                                              {:tag :element-index} (get scene-data {:tag :element-index})))
+                          {:draw-mode :triangles
+                           :first     0
+                           :count     (get-in model [:indices :count])} target)))
+    (when-not target
+      (let [program (:shadow-map programs)
+            inputs  (:inputs program)]
+        (progs/draw-specular-with-shadow-map driver gd/draw-elements program
+                                             p cube-1-mv (utils/get-normal-matrix cube-1-mv)
+                                             (:vertices cube-1) (:normals cube-1)
+                                             spot-location spot-direction
+                                             spot-inner-angle spot-outer-angle
+                                             spot-radius spot-color
+                                             (:texture-coords cube-1) color-texture (get-in state [:framebuffer :depth])
+                                             (:indices cube-1) :triangle-strip 0 36 ;;(get-in cube-1 [:indices :count])
+                                             )
+        
+        (progs/draw-specular-with-shadow-map driver gd/draw-elements program
+                                             p model-mv (utils/get-normal-matrix model-mv)
+                                             (:vertices model) (:normals model)
+                                             spot-location spot-direction
+                                             spot-inner-angle spot-outer-angle
+                                             spot-radius spot-color
+                                             (:texture-coords model) color-texture (get-in state [:framebuffer :depth])
+                                             (:indices model) :triangles 0 (get-in model [:indices :count]))
 
-(defn draw-sky-box [driver program state p sky-box pitch yaw]
-  (let [gl   (gd/gl driver)
-        data (-> (select-keys {u-sky-box-p-matrix      p
-                               u-sky-box-sampler       sky-box
-                               a-sky-box-position      sky-box-vertices
-                               a-sky-box-texture-coord sky-box-vertices
-                               u-sky-box-mv-matrix     {:data (-> mat44
-                                                                  (geom/rotate-x pitch)
-                                                                  (geom/rotate-y yaw))}}
-                              (:inputs program))
-                 (assoc {:tag :element-index} sky-box-indices))]
-    (gd/draw-elements driver (gd/bind driver program data)
-                      {:draw-mode :triangles
-                       :count     36})))
+        (let [final-data (-> scene-data
+                             (select-keys (get-in programs [:specular :inputs]))
+                             (assoc {:tag :element-index} (get scene-data {:tag :element-index})))]
+          (gd/draw-elements driver (gd/bind driver (get programs :specular) final-data) {:draw-mode :triangles
+                                                                                          :first     0
+                                                                                          :count     (get-in model [:indices :count])}))))))
 
-(defn draw-fn [driver state]
-  (let [gl       (:gl driver)
-        now      (/ (:now state) 1000)
-        rot      (* js/Math.PI (js/Math.sin now))
-        {:keys
-         [p mv]} (:scene state)
-        mouse-x  (get-in state [:mouse 0] 0)
-        mouse-y  (get-in state [:mouse 1] 0)
-        camera   (get-in state [:scene :camera])]
-    ;; First draw your skybox
-    (draw-sky-box driver (get-in state [:runtime :programs :sky-box])
-                  state p (get-in state [:skybox :texture])
-                  (- (:pitch camera)) (- (:yaw camera)))
-    ;; Clear the depth buffer so that other things can be drawn on top
-    ;; of our sky.
-    (.clear gl (.-DEPTH_BUFFER_BIT gl))
-    ;; Now draw the rest of the scene
-    ))
+(def square
+  {:vertices {:data       [[ 1  1  0]
+                           [-1  1  0]
+                           [ 1 -1  0]
+                           [-1 -1  0]]
+              :immutable? true
+              :id         :square-vertices}
+   :colors   {:data       [[1 0 0 1]
+                           [0 1 0 1]
+                           [0 0 1 1]
+                           [1 1 1 1]]
+              :immutable? true
+              :id         :square-colors}
+   :texture-coords {:id         :square-texture-coords
+                    :immutable? true
+                    :data       [0.0 0.0
+                                 1.0 0.0
+                                 1.0 1.0
+                                 0.0 1.0]}})
 
-(defn animate-pure [draw-fn step-fn current-value]
-  (js/requestAnimationFrame
-   (fn [time]
-     (let [next-value (step-fn time current-value)]
-       (draw-fn next-value)
-       (if (:manual-tick? initial-query-map)
-         (set! (.-tick js/window)
-               #(animate-pure draw-fn step-fn next-value))
-         (animate-pure draw-fn step-fn next-value))))))
+(defn draw-fn [gl driver]
+  (fn [state]
+    (let [programs (:programs state)
+          gd-fb              (get-in state [:framebuffer])
+          raw-fb             (get-in gd-fb [:frame-buffer])
+          now                (/ (.getTime (js/Date.)) 250)
+          spot-location      (vec3 [(* 20 js/Math.PI (js/Math.cos (/ now 3))) 0 0;; 0
+                                    ]) ;; 0)
+          spot-direction     (vec3  #_[(* 2 js/Math.PI (js/Math.sin now)) ;;(utils/deg->rad (* (get-in state [:mouse :pos 0]) 2))
+                                       (* 2 js/Math.PI (js/Math.cos (/ now 3))) ;;
+                                     1 ;;(utils/deg->rad (* (get-in state [:mouse :pos 1]) 2))
+                                     
+                                     ]
+                                    [0 -0.5 -7])
+          spot-inner-angle   0
+          spot-outer-angle   2
+          spot-radius        1
+          spot-color         #js[0.7 0.7 0.7]
+          light-view-matrix  (mat/look-at spot-location spot-direction (vec3 0 0 1))
+          camera-view-matrix (-> M44
+                                 (geom/translate [-3 1 2.5])
+                                 (geom/rotate-around-axis [0 1 0] (utils/deg->rad -30)))]
+      (js/console.log (object-array spot-location) (object-array spot-direction))
+      ;; First draw to the framebuffer      
+      (.viewport gl 0 0 512 512)
+      (.bindFramebuffer gl ggl/FRAMEBUFFER raw-fb)
+      (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
+      (.bindFramebuffer gl ggl/FRAMEBUFFER nil)
+      (draw-scene driver state now spot-location spot-direction spot-inner-angle spot-outer-angle spot-radius spot-color light-view-matrix gd-fb)
+      ;; Reset the viewport and draw the "real" scene
+      (.viewport gl 0 0 (get-in state [:canvas :width]) (get-in state [:canvas :height]))
+      (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
+      (draw-scene driver state now spot-location spot-direction  spot-inner-angle spot-outer-angle spot-radius spot-color camera-view-matrix nil)
+      (let [program (:simple-texture programs)
+            inputs  (:inputs program)
+            p       (get-in state [:scene :p])
+            mv      (-> M44
+                        (geom/scale 0.2 0.2 1)
+                        (geom/translate [0 0 -3]))
+            data    {progs/u-p-matrix      p
+                     progs/u-mv-matrix     mv
+                     progs/a-position      (:vertices square)
+                     progs/a-color         (:colors square)
+                     progs/a-texture-coord (:texture-coords square)
+                     progs/u-sampler       (if (pos? (js/Math.cos (/ now 10)))
+                                             (:depth gd-fb)
+                                             (:color gd-fb))}]
+        (gd/draw-arrays driver (gd/bind driver program data) {:draw-mode :triangle-strip})))))
 
 (defn tick
   "Takes the old world value and produces a new world value, suitable
   for rendering"
-  [state]
+  [state time]
   ;; We get the elapsed time since the last render to compensate for
   ;; lag, etc.
-  (let [time-now (.getTime (js/Date.))
-        elapsed  (- time-now (:last-rendered state))
-        pos      (when-let [sensor (get-in state [:hmds :pos])]
-                   (.call (aget sensor "getState") sensor))
-        camera   (get-in state [:scene :camera])]
+  (let [time-now     (.getTime (js/Date.))
+        elapsed      (- time-now (:last-rendered state))
+        cube-diff    (/ (* 75 elapsed) 100000)]
     (-> state
-        (assoc-in [:last-rendered] time-now)
-        (assoc :now time-now))))
+        (update-in [:scene :cube-rotation] + cube-diff)
+        (assoc-in [:last-rendered] time-now))))
+
+(defn render-loop [draw-fn state-atom stop-ch]
+  (js/requestAnimationFrame
+   (fn [time]
+     (let [state      @state-atom
+           driver     (get-in state [:runtime :driver])
+           draw-frame (draw-fn (gd/gl driver) driver)]
+       (draw-frame state))
+     (if (:manual-tick? initial-query-map)
+       (set! (.-tick js/window)
+             #(render-loop draw-fn state-atom stop-ch))
+       (render-loop draw-fn state-atom stop-ch)))))
 
 (defmulti control-event
   (fn [message args state] message))
@@ -247,19 +328,6 @@
 (defn post-control-event! [msg data previous-state new-state]
   nil)
 
-(defn render-loop [draw-fn state-atom stop-ch]
-  (js/requestAnimationFrame
-   (fn [time]
-     (let [state @state-atom]
-       (draw-fn (get-in state [:runtime :driver]) state)
-       (when-let [ext (.getExtension (get-in state [:runtime :driver :gl]) "GLI_frame_terminator")]
-         ;; Useful for WebGL inspector until we have Gamma-Inspector
-         (.frameTerminator ext)))
-     (if (:manual-tick? initial-query-map)
-       (set! (.-tick js/window)
-             #(render-loop draw-fn state-atom stop-ch))
-       (render-loop draw-fn state-atom stop-ch)))))
-
 (defn main* [app-state opts]
   (let [histories                (get opts :histories (atom {})) 
         [controls-ch
@@ -278,15 +346,16 @@
     (def as app-state)
     (set! (.-state js/window) app-state)
     (render-loop draw-fn app-state nil)
+    (js/console.log "channels: " (clj->js [controls-ch stop-ch keyboard-ch]))
     (async/go
       (loop []
         (async/alt!
           controls-ch ([[msg data transient?]]
-                       ;;(print "Controls Message: " (pr-str msg)  " -> " (pr-str data))
+                       (js/console.log "Controls Message: " (pr-str msg)  " -> " (pr-str data))
                        (let [previous-state @app-state]
                          (swap! app-state
                                 (fn [state]
-                                  (tick (control-event msg data state))))
+                                  (tick (control-event msg data state) (.getTime (js/Date.)))))
                          (post-control-event! msg data previous-state @app-state)))
           ;; XXX: Should probably remove this for replay needs
           (async/timeout 15) ([]
@@ -294,57 +363,95 @@
         (recur)))))
 
 (defn main [global-app-state node]
-  (let [stop      (async/chan)
-        controls  (async/chan)
-        keyboard  (async/chan)
-        gl        (.getContext node "webgl" #js {:antialias true})
-        width     (.-clientWidth node)
-        height    (.-clientHeight node)
-        driver    (make-driver gl)
-        programs  {:sky-box (gd/program driver program-sky-box)}
-        now       (.getTime (js/Date.))
-        watch-key (gensym)]
-    (set! (.-glHandle js/window) gl)
+  (let [stop          (async/chan)
+        controls      (async/chan)
+        keyboard      (async/chan)
+        gl            (.getContext node "webgl")
+        gl-extensions [(.getExtension gl "WEBGL_depth_texture")]
+        width         (.-clientWidth node)
+        height        (.-clientHeight node)
+        driver        (utils/make-driver gl)
+        programs      {:specular      (gd/program driver progs/program-specular)
+                       :shadow-map    (gd/program driver progs/program-specular-with-shadow-map)
+                       :simple        (gd/program driver lesson-02/program-source)
+                       :skybox        (gd/program driver skybox/program-skybox)
+                       :uniform-color (gd/program driver progs/uniform-color)
+                       :simple-texture (gd/program driver progs/simple-texture)}
+        ;; WxH must be a power of two (e.g. 64, 128, 256, 512, 1024, etc.)
+        fb-width      512
+        fb-height     512
+        fb            (utils/make-frame-buffer driver fb-width fb-height)
+        local-state   (-> (app-state width height)
+                          (assoc :framebuffer fb))
+        _             (swap! global-app-state merge local-state)
+        app-state     global-app-state]
     (utils/reset-gl-canvas! node)
-    (doto gl
-      (.enable (.-DEPTH_TEST gl))
-      (.clearColor 0 0 0 1)
-      (.clear (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl))))
+    (.enable gl (.-DEPTH_TEST gl))
+    (.clearColor gl 0 0.25 0 1)
+    (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
     (go
-      (let [fix-webgl-ch (<! (async/timeout 500))
-            texture-ch   (chan)
-            scene-ch     (chan)
-            app-state    (-> (app-state width height gl node now)
-                             (update-in [:comms] merge {:controls controls
-                                                        :stop     stop
-                                                        :keyboard keyboard})
-                             (assoc-in [:runtime :programs] programs)
-                             (assoc-in [:runtime :driver] driver)
-                             (assoc-in [:debug] initial-query-map))
-            _            (utils/load-cube-map gl (str "/images/skybox/" (get-in initial-query-map [:skybox-name 0]))
-                                              (get-in initial-query-map [:skybox-name 1])
-                                              {:min :linear
-                                               :mag :linear}
-                                              {:s :clamp-to-edge
-                                               :t :clamp-to-edge}
-                                              #(put! texture-ch %))
-            skybox       (<! texture-ch)
-            app-state    (-> app-state
-                             (assoc-in [:skybox :texture] (assoc skybox
-                                                                 :immutable? true
-                                                                 :texture-id 1)))
-            _            (swap! global-app-state merge app-state)
-            app-state    global-app-state
-            next-tick    (fn []
-                           (main* app-state {:comms {:stop     stop
-                                                     :controls controls
-                                                     :keyboard keyboard}}))]
-        ;; Give the inspector 100ms to load if it's there, then try to fix it.
+      (let [texture-loaded-ch    (chan)
+            color-texture-source "/images/earth.jpg"
+            _                    (utils/load-texture! color-texture-source #(put! texture-loaded-ch %))
+            model-loaded-ch      (chan)
+            model-source         "/models/laptop.json"
+            _                    (utils/http-get model-source #(put! model-loaded-ch %))
+            model-json           (js/JSON.parse (<! model-loaded-ch))
+            model                (utils/process-immutable-json-model :laptop model-json {"vertexPositions"     :vertices
+                                                                                         "vertexNormals"       :normals
+                                                                                         "vertexTextureCoords" :texture-coords
+                                                                                         "indices"             :indices})
+            skybox-ch            (chan)
+            _                    (utils/load-cube-map gl (str "/images/skybox/" "sky1") "png"
+                                                      
+                                                      {:min :linear
+                                                       :mag :linear}
+                                                      {:s :clamp-to-edge
+                                                       :t :clamp-to-edge}
+                                                      #(put! skybox-ch %))
+            skybox               (<! skybox-ch)
+            color-image          (<! texture-loaded-ch)
+            color-texture        {:data       color-image
+                                  :filter     {:min :linear
+                                               :mag :nearest}
+                                  :wrap       {:s :repeat
+                                               :t :repeat}
+                                  :flip-y     true
+                                  :immutable? true
+                                  :id         :laptop-texture}
+            _                    (swap! app-state (fn [state]
+                                                    (-> state
+                                                        (update-in [:comms] merge {:controls controls
+                                                                                   :stop     stop
+                                                                                   :keyboard keyboard})
+                                                        (assoc-in [:runtime :driver] driver)
+                                                        (assoc-in [:programs] programs)
+                                                        (assoc-in [:scene :color-texture] color-texture)
+                                                        (assoc-in [:scene :model] model)
+                                                        ;;(assoc-in [:scene :sphere] (utils/generate-sphere :my-sphere 5 5 2))
+                                                        (assoc-in [:scene :cube-1] (utils/generate-cube :cube-1 4 4 0.3))
+                                                        (assoc-in [:skybox :texture] (assoc skybox
+                                                                                            :immutable? true
+                                                                                            :texture-id 3))
+                                                        (assoc-in [:webgl :extensions] gl-extensions))))
+            next-tick            (fn []
+                                   (main* app-state {:comms {:stop     stop
+                                                             :controls controls
+                                                             :keyboard keyboard}}))]
+        ;; Wait 100ms, and then fix the WebGL inspector if it's there.
         (<! (async/timeout 100))
+        (set! (.-glHandle js/window) gl)
         (utils/fix-webgl-inspector-quirks true true 250)
-        (when-let [capture (and (:capture-first-frame? initial-query-map)
-                                (.-captureNextFrame js/window))]
-          (.call capture))
         (if (:tick-first-frame? initial-query-map)
           (set! (.-tick js/window) next-tick)
-          (next-tick))))))
+          (do (<! (async/timeout 100))
+              (next-tick)))))))
+
+(def explanation
+  nil)
+
+(def summary
+  {:debug-keys  [[:mouse :pos]]
+   :title       title
+   :enter       main
+   :explanation explanation})

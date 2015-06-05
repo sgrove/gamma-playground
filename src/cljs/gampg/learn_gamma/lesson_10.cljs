@@ -409,7 +409,7 @@
                        (assoc-in [:last-rendered] time-now))]
     ns))
 
-(defn main [node]
+(defn main [_ node]
   (let [gl      (.getContext node "webgl")
         width   (.-clientWidth node)
         height  (.-clientHeight node)
@@ -493,3 +493,10 @@
                                           (.preventDefault event)
                                           (swap! state assoc-in [:movement direction] speed))))))))
 
+(def explanation
+  nil)
+
+(def summary
+  {:title       title
+   :enter       main
+   :explanation explanation})

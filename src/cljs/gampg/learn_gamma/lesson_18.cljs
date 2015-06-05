@@ -6,6 +6,7 @@
               [gamma-driver.drivers.basic :as driver]
               [gampg.learn-gamma.lesson-01 :as lesson-01]
               [gampg.learn-gamma.lesson-02 :as lesson-02]
+              [gampg.learn-gamma.programs :as progs]
               [gampg.utils :as utils]
               [goog.webgl :as ggl]
               [thi.ng.geom.core :as geom]
@@ -241,10 +242,10 @@
                   screen-data             (-> (get-data p model-mv (:vertices laptop-screen) (:normals laptop-screen) (get-in state [:framebuffer :depth]) (:texture-coords laptop-screen) point-lighting-location #js[0.2 0.2 0.2]  #js[0.2 0.2 0.2]  #js[0.2 0.2 0.2])
                                               (select-keys (get-in programs [:specular :inputs]))
                                               (assoc {:tag :element-index} (:indices model)))
-                  screen-texture-data     {lesson-02/u-p-matrix  p
-                                           lesson-02/u-mv-matrix square-mv
-                                           lesson-02/a-position  lesson-02/square-vertices
-                                           lesson-02/a-color     lesson-02/square-colors}]
+                  screen-texture-data     {progs/u-p-matrix  p
+                                           progs/u-mv-matrix square-mv
+                                           progs/a-position  (get-in state [:scene :square-vertices])
+                                           progs/a-color     (get-in state [:scene :square-colors])}]
       (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
       ;; First draw to the framebuffer
       (.viewport gl 0 0 512 512)
@@ -334,9 +335,7 @@
         fb-height     512
         fb            (make-frame-buffer driver fb-width fb-height)
         local-state   (-> (app-state width height)
-                          (assoc :framebuffer fb)
-                          (assoc-in [:scene :square :vertices] lesson-02/square-vertices)
-                          (assoc-in [:scene :square :colors] lesson-02/square-colors))
+                          (assoc :framebuffer fb))
         _             (swap! global-app-state merge local-state)
         state         global-app-state]
     (reset-gl-canvas! node)
@@ -379,3 +378,11 @@
           (set! (.-tick js/window) next-tick)
           (do (<! (async/timeout 100))
               (next-tick)))))))
+
+(def explanation
+  nil)
+
+(def summary
+  {:title       title
+   :enter       main
+   :explanation explanation})

@@ -213,7 +213,7 @@
         (update-in [:scene :cube-rotation] + cube-diff)
         (assoc-in [:last-rendered] time-now))))
 
-(defn main [node]
+(defn main [_ node]
   (let [gl      (.getContext node "webgl")
         width   (.-clientWidth node)
         height  (.-clientHeight node)
@@ -228,3 +228,11 @@
     (.clearColor gl 0 0 0 1)
     (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
     (animate (draw-fn gl driver program) tick state)))
+
+(def explanation
+  nil)
+
+(def summary
+  {:title       title
+   :enter       main
+   :explanation explanation})

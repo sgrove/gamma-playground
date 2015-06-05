@@ -286,7 +286,7 @@
                             :count      (count indices)
                             :immutable? true})))
 
-(defn main [node]  
+(defn main [_ node]
   (let [gl       (.getContext node "webgl")
         width    (.-clientWidth node)
         height   (.-clientHeight node)
@@ -335,3 +335,11 @@
           (set! (.-tick js/window) next-tick)
           (do (<! (async/timeout 100))
               (next-tick)))))))
+
+(def explanation
+  nil)
+
+(def summary
+  {:title       title
+   :enter       main
+   :explanation explanation})

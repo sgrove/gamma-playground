@@ -161,7 +161,7 @@
         (update-in [:scene :stars] (fn [stars] (mapv (partial move-star elapsed) stars)))
         (assoc-in [:last-rendered] time-now))))
 
-(defn main [node]
+(defn main [_ node]
   (let [gl      (.getContext node "webgl")
         width   (.-clientWidth node)
         height  (.-clientHeight node)
@@ -184,3 +184,11 @@
                                  :texture-id 0}]
                     (animate (draw-fn gl driver program) tick (assoc-in state [:scene :texture] texture)))))
       (aset image "src" "/images/star.gif"))))
+
+(def explanation
+  nil)
+
+(def summary
+  {:title       title
+   :enter       main
+   :explanation explanation})

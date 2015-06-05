@@ -1,5 +1,7 @@
 (ns gampg.utils
-  (:require [goog.webgl :as ggl]
+  (:require [gamma-driver.api :as gd]
+            [gamma-driver.drivers.basic :as driver]
+            [goog.webgl :as ggl]
             [thi.ng.geom.core :as geom]
             [thi.ng.geom.core.matrix :as mat :refer [M44]])
   (:import [goog.net XhrIo]))
@@ -415,5 +417,220 @@
    2. (set! (.-width/height canvas-node)
       width/height), respectively, or you may see no results, or strange
       results"
-  [width height]
-  (mat/perspective 45 (/ width height) 0.1 100))
+  [fov width height]
+  (mat/perspective fov (/ width height) 0.1 100))
+
+(defn get-normal-matrix [mv]
+  (-> mv
+      (geom/invert)
+      (geom/transpose)
+      (mat/matrix44->matrix33)))
+
+;; Probably temporary, just until Kovas finishes moving and some of
+;; the GD diffing stuff gets resolved
+(defn custom-input-fn [driver program binder-fn variable old-spec new-spec]
+  (let [t (:tag new-spec)]
+    (if (and false old-spec new-spec (not= :uniform t) (not= t :variable) (not= :texture t) (= (old-spec t) (new-spec t)))
+      old-spec
+      (if (and (= :uniform t) (:immutable? old-spec)
+               (not= :texture (:type variable))
+               (not= :samplerCube (:type variable)))
+        old-spec
+        (binder-fn (gd/gl driver) program variable new-spec)))))
+
+(defn make-driver [gl]
+  (driver/map->BasicDriver
+   {:gl             gl
+    :resource-state (atom {})
+    :mapping-fn     (fn [x] (or (:id x) (:element x) x))
+    :input-state    (atom {})
+    :input-fn       custom-input-fn
+    :produce-fn     driver/default-produce-fn}))
+
+(defn make-frame-buffer [driver width height]
+  (let [color {:width      width
+               :height     height
+               :texture-id 1
+               :filter     {:min :nearest}}
+        depth {:width       width
+               :height      height
+               :format-type [:depth :unsigned-short]
+               :texture-id  2
+               :filter      {:min :nearest
+                             :mag :nearest}}]
+    (gd/frame-buffer driver {:color (gd/texture driver color)
+                             :depth (gd/texture driver depth)})))
+
+
+(defn deg->rad [degrees]
+  (-> (* degrees js/Math.PI)
+      (/ 180)))
+
+(defn generate-sphere [id latitude-bands longitude-bands radius]
+  (let [raw-sphere      (vec (mapcat (fn [lat-number]
+                                       (let [theta (/ (* lat-number js/Math.PI) latitude-bands)
+                                             sin-theta (js/Math.sin theta)
+                                             cos-theta (js/Math.cos theta)]
+                                         (mapv (fn [long-number]
+                                                 (let [phi           (/ (* long-number 2 js/Math.PI) longitude-bands)
+                                                       sin-phi       (js/Math.sin phi)
+                                                       cos-phi       (js/Math.cos phi)
+                                                       x             (* cos-phi sin-theta)
+                                                       y             cos-theta
+                                                       z             (* sin-phi sin-theta)
+                                                       u             (- 1 (/ long-number longitude-bands))
+                                                       v             (- 1 (/ lat-number latitude-bands))
+                                                       normal        [x y z]
+                                                       texture-coord [u v]
+                                                       vertex        [(* x radius) (* y radius) (* z radius)]]
+                                                   [normal texture-coord vertex])) (range (inc longitude-bands))))) (range (inc latitude-bands))))
+        sphere (reduce (fn [run [normal texture-coord vertex]]
+                         (-> run
+                             (update-in [:normals :data] concat normal)
+                             (update-in [:texture-coords :data] concat texture-coord)
+                             (update-in [:vertices :data] concat vertex)))
+                       {:normals        {:id         (keyword (str (name id) "-normals"))
+                                         :data       []
+                                         :immutable? true}
+                        :texture-coords {:id         (keyword (str (name id) "-texture-coords"))
+                                         :data       []
+                                         :immutable? true}
+                        :vertices       {:id         (keyword (str (name id) "-vertices"))
+                                         :data       []
+                                         :immutable? true}} raw-sphere)
+        indices (vec (mapcat (fn [lat-number]
+                               (mapcat (fn [long-number]
+                                         (let [fst  (+ (* lat-number (inc longitude-bands)) long-number)
+                                               scnd (+ fst longitude-bands 1)]
+                                           [fst scnd (inc fst)
+                                            scnd (inc scnd) (inc fst)])) (range longitude-bands))) (range latitude-bands)))]
+    (assoc sphere :indices {:id         (keyword (str (name id) "-indices"))
+                            :data       indices
+                            :count      (count indices)
+                            :immutable? true})))
+
+(defn generate-cube [id w h d]
+  (let [[x y z] [w h d]]
+    {:vertices       {:id         (keyword (str (name id) "-vertices"))
+                      :immutable? true
+                      :data       [ ;; Front face
+                                   [(- x) (- y)  z]
+                                   [   x  (- y)  z]
+                                   [   x     y   z]
+                                   [(- x)    y   z]
+                                   
+                                   ;; Back face
+                                   [(- x) (- y) (- z)]
+                                   [(- x)    y  (- z)]
+                                   [   x     y  (- z)]
+                                   [   x  (- y) (- z)]
+                                   
+                                   ;; Top face
+                                   [(- x) y (- z)]
+                                   [(- x) y    z]
+                                   [   x  y    z]
+                                   [   x  y (- z)]
+                                   
+                                   ;; Bottom face
+                                   [(- x) (- y) (- z)]
+                                   [   x  (- y) (- z)]
+                                   [   x  (- y)    z]
+                                   [(- x) (- y)    z]
+                                   
+                                   ;; Right face
+                                   [x (- y) (- z)]
+                                   [x    y  (- z)]
+                                   [x    y     z]
+                                   [x (- y)    z]
+                                   
+                                   ;; Left face
+                                   [(- x) (- y) (- z)]
+                                   [(- x) (- y)    z]
+                                   [(- x)    y     z]
+                                   [(- x)    y  (- z)]]}
+     :texture-coords {:id         (keyword (str (name id) "-texture-coords"))
+                      :immutable? true
+                      :data       [
+                                   ;; Front face
+                                   0.0, 0.0,
+                                   1.0, 0.0,
+                                   1.0, 1.0,
+                                   0.0, 1.0,
+
+                                   ;; Back face
+                                   1.0, 0.0,
+                                   1.0, 1.0,
+                                   0.0, 1.0,
+                                   0.0, 0.0,
+
+                                   ;; Top face
+                                   0.0, 1.0,
+                                   0.0, 0.0,
+                                   1.0, 0.0,
+                                   1.0, 1.0,
+
+                                   ;; Bottom face
+                                   1.0, 1.0,
+                                   0.0, 1.0,
+                                   0.0, 0.0,
+                                   1.0, 0.0,
+
+                                   ;; Right face
+                                   1.0, 0.0,
+                                   1.0, 1.0,
+                                   0.0, 1.0,
+                                   0.0, 0.0,
+
+                                   ;; Left face
+                                   0.0, 0.0,
+                                   1.0, 0.0,
+                                   1.0, 1.0,
+                                   0.0, 1.0,]}
+     :normals        {:id         (keyword (str (name id) "-texture-coords"))
+                      :immutable? true
+                      :data       [;; Front face
+                                   [0.0,  0.0,  1.0,]
+                                   [0.0,  0.0,  1.0,]
+                                   [0.0,  0.0,  1.0,]
+                                   [0.0,  0.0,  1.0,]
+                                   
+                                   ;; Back face
+                                   [0.0,  0.0, -1.0,]
+                                   [0.0,  0.0, -1.0,]
+                                   [0.0,  0.0, -1.0,]
+                                   [0.0,  0.0, -1.0,]
+                                   
+                                   ;; Top face
+                                   [0.0,  1.0,  0.0,]
+                                   [0.0,  1.0,  0.0,]
+                                   [0.0,  1.0,  0.0,]
+                                   [0.0,  1.0,  0.0,]
+                                   
+                                   ;; Bottom face
+                                   [0.0, -1.0,  0.0,]
+                                   [0.0, -1.0,  0.0,]
+                                   [0.0, -1.0,  0.0,]
+                                   [0.0, -1.0,  0.0,]
+                                   
+                                   ;; Right face
+                                   [1.0,  0.0,  0.0,]
+                                   [1.0,  0.0,  0.0,]
+                                   [1.0,  0.0,  0.0,]
+                                   [1.0,  0.0,  0.0,]
+                                   
+                                   ;; Left face
+                                   [-1.0,  0.0,  0.0,]
+                                   [-1.0,  0.0,  0.0,]
+                                   [-1.0,  0.0,  0.0,]
+                                   [-1.0,  0.0,  0.0]]}
+     :indices        {:id         (keyword (str (name id) "-indices"))
+                      :immutable? true
+                      :data       [0  1  2     0  2  3 ;; Front face
+                                   4  5  6     4  6  7 ;; Back face
+                                   8  9  10    8 10 11 ;; Top face
+                                   12 13 14   12 14 15 ;; Bottom face
+                                   16 17 18   16 18 19 ;; Right face
+                                   20 21 22   20 22 23 ;;
+                                   ]
+                      :count      36}                  ;; Left face)
+     }))

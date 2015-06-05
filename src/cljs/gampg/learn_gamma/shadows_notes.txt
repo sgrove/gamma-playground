@@ -1,0 +1,46 @@
+From #webgl on freenode
+
+<__doc__ (pyalot from http://codeflow.org/)> seangrove:
+
+Way I currently use it is to 1) cast a shadow
+from a random direction (halton sequence for even distribution,
+importance sampled to emphasize important directions) 2) accumulate
+radiance modified by a geometric occlusion term (lambert or ggx) and
+by the shadow compare into a floating point accumulation texture
+
+For the importance sampling case, colors are normalized
+
+For the directionality I use a 64x64 per side preconvolved (with ggx)
+radiance environment map, encoded in LogLuv
+
+The importance sampling is a simple measure that takes the maximum
+radiance of the environment map, and at each iteration, sets a random
+target and then looks for a direction where the luminance is above
+that target
+
+If a hit isn't produced in N iterations (currently defaults to 150) it
+returns a random direction
+
+Also note, don't use Math.random() for anything, use ROT.RNG's
+getUniform
+
+And if you're using Halton sequences for search, you need to be
+careful to decouple hit/miss sequences because otherwise there'll be
+correlation patterns in the sample distribution
+
+So google search terms for interest: LogLuv, HDR environment map, low
+discrepancy series, halton sequence, disney ggx, lambertian
+reflectance, hamersley sequence, poisson disk, quasi monte-carlo
+methods
+
+I also do a bit of bandwidth optimization where I use all 4 channels
+(via colorMask) of a RGBA texture to pack a separate depth map, so
+that each accumulation step can do 4 accumulations in one shot
+
+
+And to minimize time spent iterating, I do dynamic GPU scaling, aiming
+for 30fps and adjusting the number of iterations done per frame based
+on how far away away I am from target (gauss-seidel relaxed ease in)
+
+Also if you ever get bored and don't know what stuff to google, just
+ask me ^^
