@@ -1375,7 +1375,7 @@
                                                      :controls controls
                                                      :keyboard keyboard}}))]
         (<! (async/timeout 500))
-        o(utils/fix-webgl-inspector-quirks true true 250)
+        (utils/fix-webgl-inspector-quirks true true 250)
         (aset js/window "processedGLTF" (clj->js scene))
         (aset js/window "scene" scene)
         

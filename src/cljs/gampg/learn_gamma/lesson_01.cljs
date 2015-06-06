@@ -79,7 +79,7 @@
     (reset-gl-canvas! node)
     (.clearColor gl 0 0 0 1)
     (.clear gl (bit-or (.-COLOR_BUFFER_BIT gl) (.-DEPTH_BUFFER_BIT gl)))
-    (let [mv (geom/translate mv [-1.5 0 -7])]
+    (let [mv (geom/translate mv [-3 0 -7])]
       (gd/draw-arrays driver (gd/bind driver program (get-data p mv triangle-vertices)) {:draw-mode :triangles}))
     (let [mv (geom/translate mv [3 0 -7])]
       (gd/draw-arrays driver (gd/bind driver program (get-data p mv square-vertices)) {:draw-mode :triangle-strip}))))
@@ -118,8 +118,9 @@ We then
    2. Binding *all* the data needed to draw the triangle: In this case, the vertices, the perspective-matrix, and the mv-matrix
  1. Draw the square (using the same steps as for the triangle)
 
-## What's that `triangle-vertices` thing?  When drawing things with
- WeblGL, you have just a few primitives - in this lesson, we'll look at
+## What's that `triangle-vertices` thing?
+
+ When drawing things with WebGL, you have just a few primitives - in this lesson, we'll look at
  buffers. Buffers are nothing more than an allocated region of memory
  that lives in the GPU. You store simple bytes in these buffers, and
  it's up to you to provide \"meaning\" to them. For example, let's say

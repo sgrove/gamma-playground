@@ -77,7 +77,7 @@
         h       (.-clientHeight node)
         driver  (make-driver gl)
         program program-source
-        p       (utils/get-perspective-matrix w h)
+        p       (utils/get-perspective-matrix 45 w h)
         mv      (mat/matrix44)]
     (reset-gl-canvas! node)
     (.clearColor gl 0 0 0 1)

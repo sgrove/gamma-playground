@@ -25,7 +25,7 @@
                    :triangle          lesson-02/triangle
                    :square            lesson-02/square
                    :mv                (mat/matrix44)
-                   :p                 (utils/get-perspective-matrix width height)}})
+                   :p                 (utils/get-perspective-matrix 45 width height)}})
 
 (defn draw-scene [gl driver program]
   (fn [state]

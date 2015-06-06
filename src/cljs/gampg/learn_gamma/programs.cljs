@@ -264,34 +264,35 @@
 (def a-normal
   (g/attribute "aNormal" :vec3))
 
-(def program-specular-with-shadow-map
-  (let [world-position (g/* u-mv-matrix (g/vec4 a-position 1))]
-    (p/program
-     {:id              :specular-with-shadow-map
-      :vertex-shader   {v-texture-coord   a-texture-coord
-                        ;; Looks like probably don't need this
-                        ;;v-transformed-normal (g/* u-n-matrix a-vertex-normal)
-                        ;;v-transformed-normal (g/* a-vertex-normal u-n-matrix)
-                        v-position        (g/* u-mv-matrix (g/vec4 a-position 1))
-                        v-light-to-point  (g/- u-spot-position (g/swizzle world-position :xyz))
-                        v-eye-to-point    (g/* -1 (g/swizzle world-position :xyz))
-                        v-shadow-position (-> depth-scale-matrix
-                                              (g/* u-light-projection-matrix)
-                                              (g/* u-light-view-matrix)
-                                              (g/* world-position))
-                        (g/gl-position)   (g/* u-p-matrix v-position)
-                        v-normal          (g/* a-normal u-n-matrix)}
-      :fragment-shader (let [light-value   (compute-light v-normal 0.5
-                                                          v-light-to-point v-eye-to-point
-                                                          u-spot-color u-spot-radius u-spot-direction u-spot-inner-angle u-spot-outer-angle)
-                             shadow-value  (compute-shadow v-shadow-position u-shadow-map)
-                             diffuse-color (g/texture2D u-sampler (g/swizzle v-texture-coord :st))
-                             final-color   (-> (g/swizzle diffuse-color :rgb)
-                                               (g/* light-value)
-                                               (g/* shadow-value))]
-                         {(g/gl-frag-color) (do (g/vec4 final-color (g/swizzle diffuse-color :a))
-                                                (g/vec4 (g/* (g/swizzle diffuse-color :rgb) shadow-value) 1))})
-      :precision       {:float :mediump}})))
+(comment
+  (def program-specular-with-shadow-map
+    (let [world-position (g/* u-mv-matrix (g/vec4 a-position 1))]
+      (p/program
+        {:id              :specular-with-shadow-map
+         :vertex-shader   {v-texture-coord   a-texture-coord
+                           ;; Looks like probably don't need this
+                           ;;v-transformed-normal (g/* u-n-matrix a-vertex-normal)
+                           ;;v-transformed-normal (g/* a-vertex-normal u-n-matrix)
+                           v-position        (g/* u-mv-matrix (g/vec4 a-position 1))
+                           v-light-to-point  (g/- u-spot-position (g/swizzle world-position :xyz))
+                           v-eye-to-point    (g/* -1 (g/swizzle world-position :xyz))
+                           v-shadow-position (-> depth-scale-matrix
+                                                 (g/* u-light-projection-matrix)
+                                                 (g/* u-light-view-matrix)
+                                                 (g/* world-position))
+                           (g/gl-position)   (g/* u-p-matrix v-position)
+                           v-normal          (g/* a-normal u-n-matrix)}
+         :fragment-shader (let [light-value   (compute-light v-normal 0.5
+                                                             v-light-to-point v-eye-to-point
+                                                             u-spot-color u-spot-radius u-spot-direction u-spot-inner-angle u-spot-outer-angle)
+                                shadow-value  (compute-shadow v-shadow-position u-shadow-map)
+                                diffuse-color (g/texture2D u-sampler (g/swizzle v-texture-coord :st))
+                                final-color   (-> (g/swizzle diffuse-color :rgb)
+                                                  (g/* light-value)
+                                                  (g/* shadow-value))]
+                            {(g/gl-frag-color) (do (g/vec4 final-color (g/swizzle diffuse-color :a))
+                                                   (g/vec4 (g/* (g/swizzle diffuse-color :rgb) shadow-value) 1))})
+         :precision       {:float :mediump}}))))
 
 (defn draw-specular-with-shadow-map [driver draw program p mv normal-matrix vertices normals
                                      spot-location spot-direction 

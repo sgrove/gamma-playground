@@ -15,17 +15,8 @@
               [gampg.learn-gamma.lesson-11 :as lg11]
               [gampg.learn-gamma.lesson-12 :as lg12]
               [gampg.learn-gamma.lesson-13 :as lg13]
-              [gampg.learn-gamma.lesson-14 :as lg14]
-              [gampg.learn-gamma.lesson-15 :as lg15]
-              [gampg.learn-gamma.lesson-16 :as lg16]
-              [gampg.learn-gamma.lesson-17 :as lg17]
-              [gampg.learn-gamma.lesson-18 :as lg18]
-              [gampg.learn-gamma.lesson-19 :as lg19]
-              [gampg.learn-gamma.lesson-20 :as lg20]
               [gampg.learn-gamma.apartment :as lg-apartment]
-              [gampg.learn-gamma.apartment-vr :as lg-vr]
               [gampg.learn-gamma.gltf :as lg-gltf]
-              [gampg.learn-gamma.lightmap :as lg-lightmap]
               [markdown.core :as md]
               [om.core :as om :include-macros true]
               [om.dom :as dom :include-macros true]))
@@ -47,23 +38,12 @@
    lg11/summary
    lg12/summary
    lg13/summary
-   lg14/summary
-   lg15/summary
-   lg16/summary
-   lg17/summary
-   lg18/summary
-   lg19/summary
-   lg20/summary
    ])
 
 (defonce app-state
-  (atom {:current-lesson {:index 19
+  (atom {:current-lesson {:index 0
                           :exit  nil
                           :enter nil}}))
-
-#_(add-watch app-state :lg-watcher
-           (fn [key a old-state new-state]
-             (js/console.log "State changed! " (pr-str (keys (:scene old-state))) " -> " (pr-str (keys (:scene new-state))))))
 
 (defn main* []
   (om/root
@@ -73,36 +53,37 @@
        (render [_]
          (let [current-lesson (:current-lesson app)
                summary        (nth lessons (:index current-lesson))]
-           (dom/div #js{:className "row"}
-                    (dom/div #js{:className "col-xs-0 col-md-2 col-lg-2 col-xl-2"}
-                             (dom/h2 nil "Lessons")
-                             (apply dom/ul nil
-                                    (map (fn [idx lesson-summary]
-                                           (dom/li #js{:style #js{:overflow "hidden"}}
-                                                   (dom/a #js{:href "#"
-                                                              :onClick (fn [event]
-                                                                         ;; TODO: Call the exit fn of the old lesson and the entry fn of the new
-                                                                         (om/transact! app [:current-lesson]
-                                                                                       (fn [old-lesson]
-                                                                                         (when-let [exit (get-in lessons [(:index old-lesson) :exit])]
-                                                                                           (js/console.log "Exiting old lesson...")
-                                                                                           (exit app  (get-in app [:live :gl])))
-                                                                                         (let [new-lesson  (get-in lessons [idx])
-                                                                                               next-lesson (merge new-lesson
-                                                                                                                  {:index idx})]
-                                                                                           (js/console.log "Entering new lesson...: " (pr-str next-lesson))
-                                                                                           ((:enter new-lesson) app-state (get-in app [:live :node]))
-                                                                                           next-lesson)))
-                                                                         (.preventDefault event)
-                                                                         (.stopPropagation event))} (:title lesson-summary)))) (range) lessons)))
-                    (dom/div #js{:className "col-xs-12 col-md-10 col-lg-10 col-lg-12"}
-                             (dom/div nil
-                                      (dom/h2 #js{} (:title summary))
-                                      (let [debug-data  (reduce merge {} (map (juxt identity #(get-in app %)) (:debug-keys summary)))]
-                                        (when (seq debug-data)
-                                          (dom/code nil (with-out-str (fipp/pprint debug-data {:width 80})))))
-                                      (dom/div #js{:dangerouslySetInnerHTML #js{:__html (md/md->html (or (:explanation summary)
-                                                                                                         "No explanation for this lesson"))}}))))))))
+           (dom/div #js {:className "container-fluid"}
+                    (dom/div #js{:className "row"}
+                             (dom/div #js{:className "col-xs-0 col-md-2 col-lg-2 col-xl-2"}
+                                      (dom/h2 nil "Lessons")
+                                      (apply dom/ul nil
+                                             (map (fn [idx lesson-summary]
+                                                    (dom/li #js{:style #js{:overflow "hidden"}}
+                                                            (dom/a #js{:href "#"
+                                                                       :onClick (fn [event]
+                                                                                  ;; TODO: Call the exit fn of the old lesson and the entry fn of the new
+                                                                                  (om/transact! app [:current-lesson]
+                                                                                                (fn [old-lesson]
+                                                                                                  (when-let [exit (get-in lessons [(:index old-lesson) :exit])]
+                                                                                                    (js/console.log "Exiting old lesson...")
+                                                                                                    (exit app  (get-in app [:live :gl])))
+                                                                                                  (let [new-lesson  (get-in lessons [idx])
+                                                                                                        next-lesson (merge new-lesson
+                                                                                                                           {:index idx})]
+                                                                                                    (js/console.log "Entering new lesson...: " (pr-str next-lesson))
+                                                                                                    ((:enter new-lesson) app-state (get-in app [:live :node]))
+                                                                                                    next-lesson)))
+                                                                                  (.preventDefault event)
+                                                                                  (.stopPropagation event))} (:title lesson-summary)))) (range) lessons)))
+                             (dom/div #js{:className "col-xs-12 col-md-10 col-lg-10"}
+                                      (dom/div nil
+                                               (dom/h2 #js{} (:title summary))
+                                               (let [debug-data  (reduce merge {} (map (juxt identity #(get-in app %)) (:debug-keys summary)))]
+                                                 (when (seq debug-data)
+                                                   (dom/code nil (with-out-str (fipp/pprint debug-data {:width 80})))))
+                                               (dom/div #js{:dangerouslySetInnerHTML #js{:__html (md/md->html (or (:explanation summary)
+                                                                                                                  "No explanation for this lesson"))}})))))))))
    app-state
    {:target (. js/document (getElementById "app"))}))
 

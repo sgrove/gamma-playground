@@ -19,3 +19,5 @@ resources/public/images/apartment
 resources/public/models/*.dae
 resources/public/models/apartment_2/**
 resources/public/models/corner_couch
+figwheel_server.log
+gampg.iml
