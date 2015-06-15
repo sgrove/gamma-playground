@@ -31,8 +31,9 @@
   :min-lein-version "2.5.0"
   :clean-targets ^{:protect false} [:target-path :compile-path "resources/public/js"]
   :profiles {:dev {:source-paths ["env/dev/clj"]
-                   :dependencies [[figwheel "0.3.3"]
-                                  [figwheel-sidecar "0.3.3"]]
+                   :dependencies [[figwheel-sidecar "0.3.3"]
+                                  [http-kit "2.1.18"] ;override figwheel's version to fix #152
+                                  ]
                    :cljsbuild {:test-commands { "test" ["phantomjs" "env/test/js/unit-test.js" "env/test/unit-test.html"] }
                                :builds {:test {:source-paths ["src/cljs" "test/cljs"]
                                                :compiler {:output-to     "resources/public/js/app_test.js"
