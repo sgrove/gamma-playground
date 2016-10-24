@@ -445,7 +445,7 @@
     :mapping-fn     (fn [x] (or (:id x) (:element x) x))
     :input-state    (atom {})
     :input-fn       custom-input-fn
-    :produce-fn     driver/default-produce-fn}))
+    :produce-fn     driver/produce}))
 
 (defn make-frame-buffer [driver width height]
   (let [color {:width      width

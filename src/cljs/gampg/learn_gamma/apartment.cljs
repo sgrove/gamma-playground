@@ -462,7 +462,7 @@
                            reflection-direction      (g/reflect (g/* -1 light-direction) normal)
                            specular-light-weighting  (-> (g/dot reflection-direction eye-direction)
                                                          (g/max 0)
-                                                         (g/pow u-material-shininess))
+                                                         (g/power u-material-shininess))
                            diffuse-light-weighting (-> (g/dot normal light-direction)
                                                        (g/max 0))
                            light-weighting           (-> (g/+ u-ambient-color u-point-lighting-specular-color)
@@ -619,7 +619,7 @@
     :mapping-fn     (fn [x] (or (:id x) (:element x) x))
     :input-state    (atom {})
     :input-fn       my-input-fn
-    :produce-fn     driver/default-produce-fn}))
+    :produce-fn     driver/produce}))
 
 (defn reset-gl-canvas! [canvas-node]
   (let [gl     (.getContext canvas-node "webgl")

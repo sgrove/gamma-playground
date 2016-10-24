@@ -146,7 +146,7 @@
                                                          (g/reflect normal))
                            specular-light-brightness (-> (g/dot reflection-direction eye-direction)
                                                          (g/max 0)
-                                                         (g/pow u-material-shininess))
+                                                         (g/power u-material-shininess))
                            specular-light-weighting  (g/* u-point-lighting-diffuse-color specular-light-brightness)
                            diffuse-light-brightness  (-> (g/dot normal light-direction)
                                                          (g/max 0))
@@ -235,7 +235,7 @@
         shininess        8 ;; Why 8?
         specular-factor  (-> (g/dot r e)
                              (g/clamp 0 1)
-                             (g/pow shininess)
+                             (g/power shininess)
                              (g/* specular-level))
         light-value      (g/if (g/< lambert-term 0)
                            (g/vec3 0 0 0)

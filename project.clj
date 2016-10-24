@@ -13,6 +13,7 @@
                  [fipp "0.6.2"]
                  [instaparse "1.4.0"]
                  [kovasb/gamma-driver "0.0-49"]
+                 [kovasb/gamma "0.0-135"]
                  [markdown-clj "0.9.66"]
                  [org.omcljs/om "0.8.8"]
                  [org.clojure/clojure "1.7.0-beta3"]

@@ -107,7 +107,7 @@
                                                          (g/* 255))
                            specular-light-weighting  (-> (g/dot reflection-direction eye-direction)
                                                          (g/max 0)
-                                                         (g/pow shininess))
+                                                         (g/power shininess))
                            diffuse-light-weighting   (-> (g/dot normal light-direction)
                                                          (g/max 0))
                            light-weighting           (g/+ u-ambient-color
