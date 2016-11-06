@@ -90,7 +90,7 @@
                            reflection-direction      (g/reflect (g/* -1 light-direction) normal)
                            specular-light-weighting  (-> (g/dot reflection-direction eye-direction)
                                                          (g/max 0)
-                                                         (g/pow u-material-shininess))
+                                                         (g/power u-material-shininess))
                            diffuse-light-weighting (-> (g/dot normal light-direction)
                                                        (g/max 0))
                            light-weighting           (-> (g/+ u-ambient-color u-point-lighting-specular-color)

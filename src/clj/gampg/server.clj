@@ -1,41 +1,38 @@
 (ns gampg.server
   (:require [clojure.java.io :as io]
-            [gampg.dev :refer [is-dev? inject-devmode-html browser-repl start-figwheel]]
             [compojure.core :refer [GET defroutes]]
             [compojure.route :refer [resources]]
             [net.cgrand.enlive-html :refer [deftemplate]]
-            [net.cgrand.reload :refer [auto-reload]]
-            [ring.middleware.reload :as reload]
             [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
-            [environ.core :refer [env]]
-            [ring.adapter.jetty :refer [run-jetty]]))
+            [ring.adapter.jetty :refer [run-jetty]]
+            [com.stuartsierra.component :as component]))
 
-(deftemplate page (io/resource "index.html") []
-  [:body] (if is-dev? inject-devmode-html identity))
+(defn routes [index]
+  (compojure.core/routes
+    (resources "/")
+    (resources "/react" {:root "cljsjs/development"})
+    (GET "/*" req index)))
 
-(defroutes routes
-  (resources "/")
-  (resources "/react" {:root "cljsjs/development"})
-  (GET "/*" req (page)))
+(defn http-handler [index]
+  (wrap-defaults (routes index) api-defaults))
 
-(def http-handler
-  (if is-dev?
-    (reload/wrap-reload (wrap-defaults #'routes api-defaults))
-    (wrap-defaults routes api-defaults)))
+(def page (slurp (io/resource "index.html")))
 
-(defn run-web-server [& [port]]
-  (let [port (Integer. (or port (env :port) 10555))]
-    (print "Starting web server on port" port ".\n")
-    (run-jetty http-handler {:port port :join? false})))
+(defn run-web-server [port index]
+  (print "Starting web server on port" port ".\n")
+  (run-jetty (http-handler index) {:port port :join? false}))
 
-(defn run-auto-reload [& [port]]
-  (auto-reload *ns*)
-  (start-figwheel))
+(defrecord JettyServer [port index jetty]
+  component/Lifecycle
+  (start [t]
+    (if-not jetty
+      (assoc t :jetty (run-web-server port index))
+      t))
+  (stop [t]
+    (when jetty
+      (.stop jetty))
+    (assoc t :jetty nil)))
 
-(defn run [& [port]]
-  (when is-dev?
-    (run-auto-reload))
-  (run-web-server port))
-
-(defn -main [& [port]]
-  (run port))
+(defn system [port index]
+  (component/system-map
+    :jetty (map->JettyServer {:port port :index index})))
